@@ -27,15 +27,10 @@
 
 #define SQUARE(a) ((a) * (a))
 
-#define global static
-#define local static
-#define function static
-
 // todo - memory wrappers for crt - https://youtu.be/6_AvIAlKhG8?t=725
 // for more helper macros like int / point arithmatic, member offsets, etc - https://youtu.be/6_AvIAlKhG8?t=435
 
 #include "stdint.h"
-
 typedef int8_t int8;
 typedef int16_t int16;
 typedef int32_t int32;
@@ -48,32 +43,29 @@ typedef uint64_t uint64;
 typedef int8_t bool8; // you're either after a 1 or 0
 typedef int8_t bool64; // or 64 bits for packing a bunch of flags. There is no in-between.
 
-// I'm thinking we pull a Godot and just have a project-wide define on the precision. I'll keep it 32-bit for now.
-typedef float real;
-
 // todo - min/max ints, pi, infinity, and other constants https://youtu.be/Wggh4K6wdgA?t=284
 
-// todo - converter functions helpers for handmade math (separate file called thomas_handmade.h which'll be the glue)
+// todo - converter statics helpers for handmade math (separate file called thomas_handmade.h which'll be the glue)
 
 typedef struct vec2_int32 vec2_int32;
 typedef struct vec4_uint8 vec4_uint8;
 
-typedef struct vec2_real vec2_real;
-typedef struct vec3_real vec3_real;
-typedef struct vec4_real vec4_real;
+typedef struct vec2_float vec2_float;
+typedef struct vec3_float vec3_float;
+typedef struct vec4_float vec4_float;
 
-typedef struct range1_real range1_real;
-typedef struct range2_real range2_real;
+typedef struct range1_float range1_float;
+typedef struct range2_float range2_float;
 
 typedef struct mat4 mat4;
 
 // default types
 typedef vec2_int32 vec2i;
-typedef vec2_real vec2;
-typedef vec3_real vec3;
-typedef vec4_real vec4;
-typedef range1_real range1;
-typedef range2_real range2;
+typedef vec2_float vec2;
+typedef vec3_float vec3;
+typedef vec4_float vec4;
+typedef range1_float range1;
+typedef range2_float range2;
 
 // todo - pull function defs up top so I can see wassup
 
@@ -91,38 +83,38 @@ struct vec4_uint8
 	uint8 a;
 };
 
-struct vec2_real
+struct vec2_float
 {
-	real x;
-	real y;
+	float x;
+	float y;
 };
 
-struct vec3_real
+struct vec3_float
 {
-	real x;
-	real y;
-	real z;
+	float x;
+	float y;
+	float z;
 };
 
-struct vec4_real
+struct vec4_float
 {
 	// todo - union for rgba and elements array
-	real x;
-	real y;
-	real z;
-	real w;
+	float x;
+	float y;
+	float z;
+	float w;
 };
 
-struct range1_real
+struct range1_float
 {
-	real min;
-	real max;
+	float min;
+	float max;
 };
 
-struct range2_real
+struct range2_float
 {
-	vec2_real min;
-	vec2_real max;
+	vec2_float min;
+	vec2_float max;
 };
 
 struct mat4
@@ -130,58 +122,58 @@ struct mat4
 	float elements[4][4];
 };
 
-function vec2 vec2_multiply_real(const vec2& vec, const real& scale)
+static vec2 vec2_multiply_float(const vec2& vec, const float& scale)
 {
 	vec2 result = vec;
 	result.x *= scale;
 	result.y *= scale;
 	return result;
 }
-function vec2 vec2_multiply_vec2(const vec2& vec_a, const vec2& vec_b)
+static vec2 vec2_multiply_vec2(const vec2& vec_a, const vec2& vec_b)
 {
 	vec2 result = vec_a;
 	result.x *= vec_b.x;
 	result.y *= vec_b.y;
 	return result;
 }
-function vec2 operator*(const real& scale, const vec2& vec)
+static vec2 operator*(const float& scale, const vec2& vec)
 {
-	return vec2_multiply_real(vec, scale);
+	return vec2_multiply_float(vec, scale);
 }
-function vec2 operator*(const vec2& vec, const real& scale)
+static vec2 operator*(const vec2& vec, const float& scale)
 {
-	return vec2_multiply_real(vec, scale);
+	return vec2_multiply_float(vec, scale);
 }
-function vec2 operator*(const vec2& vec_a, const vec2& vec_b)
+static vec2 operator*(const vec2& vec_a, const vec2& vec_b)
 {
 	return vec2_multiply_vec2(vec_a, vec_b);
 }
 
-function vec2 vec2_add_vec2(const vec2& vec_a, const vec2& vec_b)
+static vec2 vec2_add_vec2(const vec2& vec_a, const vec2& vec_b)
 {
 	vec2 result = vec_a;
 	result.x += vec_b.x;
 	result.y += vec_b.y;
 	return result;
 }
-function vec2 operator+(const vec2& vec_a, const vec2& vec_b)
+static vec2 operator+(const vec2& vec_a, const vec2& vec_b)
 {
 	return vec2_add_vec2(vec_a, vec_b);
 }
 
-function vec2 vec2_subtract_vec2(const vec2& vec_a, const vec2& vec_b)
+static vec2 vec2_subtract_vec2(const vec2& vec_a, const vec2& vec_b)
 {
 	vec2 result = vec_a;
 	result.x -= vec_b.x;
 	result.y -= vec_b.y;
 	return result;
 }
-function vec2 operator-(const vec2& vec_a, const vec2& vec_b)
+static vec2 operator-(const vec2& vec_a, const vec2& vec_b)
 {
 	return vec2_subtract_vec2(vec_a, vec_b);
 }
 
-function vec2& operator+=(vec2& self, const vec2& other)
+static vec2& operator+=(vec2& self, const vec2& other)
 {
 	self.x += other.x;
 	self.y += other.y;
@@ -189,7 +181,7 @@ function vec2& operator+=(vec2& self, const vec2& other)
 }
 
 
-function range2 range2_shift(const range2& rng, const vec2& v)
+static range2 range2_shift(const range2& rng, const vec2& v)
 {
 	range2 result = rng;
 	result.min += v;
@@ -197,7 +189,7 @@ function range2 range2_shift(const range2& rng, const vec2& v)
 	return result;
 }
 
-function vec2 range2_size(const range2& rng)
+static vec2 range2_size(const range2& rng)
 {
 	assert(rng.max.x >= rng.min.x && rng.max.y >= rng.min.y);
 	vec2 result;

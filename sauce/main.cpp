@@ -27,17 +27,14 @@
 
 ## Dump
 
-figure out how I wanna get this array goin
-template <typename T> struct List
-{
-	T* first;
-};
+- [ ] basic memory arenas that don't make use of 64-bit so I can be portable with WASM
 
 */
 
 #define APP_NAME "Game C"
-#define MOVE_SPEED 100.0f
+#define MOVE_SPEED 2000.0f
 #define PIXEL_SCALE 30.0f
+#define GRAVITY 1000.0f
 
 template <typename T, uint32 max_count>
 struct array_flat {
@@ -62,17 +59,23 @@ struct RigidBody {
 
 struct WorldState {
 	array_flat<RigidBody, 128> rigid_bodies;
+	RigidBody* player;
 };
 
 struct AppState {
 	WorldState world;
+	bool8 key_down[SAPP_KEYCODE_MENU];
+	bool8 key_pressed[SAPP_KEYCODE_MENU];
+	bool8 key_released[SAPP_KEYCODE_MENU];
 };
-global AppState state = {0};
+static AppState state = {0};
 
-function void frame(void) {
+static void frame(void) {
 	vec2i view_rect = { sapp_width(), sapp_height() };
-	real ratio = view_rect.x / (real)view_rect.y;
-	real delta_t = sapp_frame_duration();
+	float ratio = view_rect.x / (float)view_rect.y;
+	float delta_t = sapp_frame_duration();
+	WorldState* world = &state.world;
+	RigidBody* player = world->player;
 
 	// BEGIN RENDER
 	sgp_begin(view_rect.x, view_rect.y);
@@ -82,18 +85,29 @@ function void frame(void) {
 	sgp_set_color(0.1f, 0.1f, 0.1f, 1.0f);
 	sgp_clear();
 
+	// PLAYER INPUT
+	if (state.key_pressed[SAPP_KEYCODE_SPACE]) {
+		player->vel.y = 300.0f;
+	}
+	vec2 axis_input = { 0 };
+	if (state.key_down[SAPP_KEYCODE_A]) {
+		axis_input.x -= 1.0f;
+	}
+	if (state.key_down[SAPP_KEYCODE_D]) {
+		axis_input.x += 1.0f;
+	}
+	player->acc = axis_input * MOVE_SPEED;
+
 	// Physics update
-	for (int i = 0; i < state.world.rigid_bodies.count; i++)
-	{
-		RigidBody* body = &state.world.rigid_bodies[i];
-		body->acc = vec2(-1.f, -1.f) * MOVE_SPEED;
+	for (int i = 0; i < world->rigid_bodies.count; i++) {
+		RigidBody* body = &world->rigid_bodies[i];
 
 		// acc counter force with existing velocity
 		body->acc.x += -15.0f * body->vel.x;
 
 		// gravity
 		bool8 falling = body->vel.y < 0.f;
-		body->acc.y -= (falling ? 2.f : 1.f) * 100.f;
+		body->acc.y -= (falling ? 2.f : 1.f) * GRAVITY;
 
 		// integrate acceleration and velocity into position
 		vec2 next_pos = 0.5f * body->acc * SQUARE(delta_t) + body->vel * delta_t + body->pos;
@@ -103,16 +117,14 @@ function void frame(void) {
 		body->acc.x = 0;
 		body->acc.y = 0;
 
-		if (next_pos.y < 0.f)
-		{
+		if (next_pos.y < 0.f) {
 			next_pos.y = 0.f;
 		}
 
 		body->pos = next_pos;
 
 		// push render rect
-		DEFER_LOOP(sgp_push_transform(), sgp_pop_transform())
-		{
+		DEFER_LOOP(sgp_push_transform(), sgp_pop_transform()) {
 			range2 rect = body->box;
 			rect = range2_shift(rect, body->pos);
 
@@ -123,8 +135,8 @@ function void frame(void) {
 		}
 	}
 
-	real time = sapp_frame_count() * sapp_frame_duration();
-	real r = sinf(time)*0.5 + 0.5, g = cosf(time)*0.5 + 0.5;
+	float time = sapp_frame_count() * sapp_frame_duration();
+	float r = sinf(time)*0.5 + 0.5, g = cosf(time)*0.5 + 0.5;
 	//sgp_set_color(r, g, 0.3f, 1.0f);
 	//sgp_rotate_at(time, 0.0f, 0.0f);
 	//sgp_scale(100.0f, 100.f);
@@ -136,13 +148,17 @@ function void frame(void) {
 	sgp_end();
 	sg_end_pass();
 	sg_commit();
+
+	// clear press and release events
+	memset(&state.key_pressed, 0, sizeof(state.key_pressed));
+	memset(&state.key_released, 0, sizeof(state.key_pressed));
 }
 
-function void init(void) {
-
-	state.world.rigid_bodies[0].box = range2(vec2(0, 0), vec2(5.0f, 10.0f));
-	state.world.rigid_bodies[0].pos.y = 100.0f;
+static void init(void) {
+	state.world.player = &state.world.rigid_bodies[0];
 	state.world.rigid_bodies.count++;
+	state.world.player->box = range2(vec2(0, 0), vec2(5.0f, 10.0f));
+	state.world.player->pos.y = 100.0f;
 
 	sg_desc sgdesc = { .context = sapp_sgcontext() };
 	sg_setup(&sgdesc);
@@ -159,9 +175,26 @@ function void init(void) {
 	}
 }
 
-function void cleanup(void) {
+static void cleanup(void) {
 	sgp_shutdown();
 	sg_shutdown();
+}
+
+static void event(const sapp_event* ev) {
+	switch (ev->type) {
+	case SAPP_EVENTTYPE_KEY_UP: {
+		bool8 already_up = !state.key_down[ev->key_code];
+		if (!already_up)
+			state.key_released[ev->key_code] = 1;
+		state.key_down[ev->key_code] = 0;
+	} break;
+	case SAPP_EVENTTYPE_KEY_DOWN: {
+		bool8 already_down = state.key_down[ev->key_code];
+		if (!already_down)
+			state.key_pressed[ev->key_code] = 1;
+		state.key_down[ev->key_code] = 1;
+	} break;
+	}
 }
 
 sapp_desc sokol_main(int argc, char* argv[]) {
@@ -171,6 +204,7 @@ sapp_desc sokol_main(int argc, char* argv[]) {
 		.init_cb = init,
 		.frame_cb = frame,
 		.cleanup_cb = cleanup,
+		.event_cb = event,
 		.sample_count = 4, // Enable anti aliasing.
 		.window_title = APP_NAME,
 	};
