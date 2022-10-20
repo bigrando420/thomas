@@ -1,4 +1,5 @@
-#pragma once
+#ifndef TH_BASE_H
+#define BASE_H
 
 // thx to Big Al for the inspiration - https://www.youtube.com/watch?v=6_AvIAlKhG8&list=PLT6InxK-XQvNKTyLXk6H6KKy12UYS_KDL&index=2
 
@@ -11,6 +12,10 @@
 #else
 #define assert(condition)
 #endif
+
+#define PRINT_STRING(_str) OutputDebugString(_str)
+// @string - if you overrun this with a long string, you will die.
+#define LOG(_str, ...) {char output[256] = { 0 }; sprintf(output, _str"\n", __VA_ARGS__); PRINT_STRING(output);}
 
 #define STRINGIFY(str) #str
 #define GLUE(a, b) a##b
@@ -27,6 +32,9 @@
 
 #define SQUARE(a) ((a) * (a))
 
+#define PI_FLOAT (3.1415926535897f)
+
+#define MEMORY_ZERO_STRUCT(struct_ptr) memset(struct_ptr, 0, sizeof(*(struct_ptr)))
 // todo - memory wrappers for crt - https://youtu.be/6_AvIAlKhG8?t=725
 // for more helper macros like int / point arithmatic, member offsets, etc - https://youtu.be/6_AvIAlKhG8?t=435
 
@@ -41,7 +49,9 @@ typedef uint32_t uint32;
 typedef uint64_t uint64;
 
 typedef int8_t bool8; // you're either after a 1 or 0
-typedef int8_t bool64; // or 64 bits for packing a bunch of flags. There is no in-between.
+// or
+typedef int8_t bool64; // 64 bits for packing a bunch of flags
+// There is no in-between.
 
 // todo - min/max ints, pi, infinity, and other constants https://youtu.be/Wggh4K6wdgA?t=284
 
@@ -67,7 +77,7 @@ typedef vec4_float vec4;
 typedef range1_float range1;
 typedef range2_float range2;
 
-// todo - pull function defs up top so I can see wassup
+// todo - move definitions into internal.cpp and create a clean .h API
 
 struct vec2_int32
 {
@@ -98,11 +108,22 @@ struct vec3_float
 
 struct vec4_float
 {
-	// todo - union for rgba and elements array
-	float x;
-	float y;
-	float z;
-	float w;
+	union {
+		float x;
+		float r;
+	};
+	union {
+		float y;
+		float g;
+	};
+	union {
+		float z;
+		float b;
+	};
+	union {
+		float w;
+		float a;
+	};
 };
 
 struct range1_float
@@ -197,3 +218,75 @@ static vec2 range2_size(const range2& rng)
 	result.y = rng.max.y - rng.min.y;
 	return result;
 }
+
+static bool8 float_equals(const float& a, const float& b, const float& epsilon = 0.00001f) {
+	return (fabsf(a - b) < epsilon);
+}
+
+static bool float_is_zero(const float& a) {
+	return float_equals(a, 0.0f);
+}
+
+// @robust - test this properly with a slider visual to see what happens when it goes out of bounds
+static float float_lerp(const float& x, const float& a, const float& b) {
+	return a * (1.f - x) + (b * x);
+}
+
+static float float_map(const float& x, const float& x_min, const float& x_max, const float& map_min, const float& map_max) {
+	return ((x - x_min) / (x_max - x_min) * (map_max - map_min) + map_min);
+}
+
+// Progress of x in the range of begin -> end. Guarenteed to be 0 -> 1
+// is this just a normalised lerp?
+static float float_alpha(const float& x, const float& begin, const float& end) {
+	if (float_equals(begin, end))
+		return begin;
+	float delta = end - begin;
+	float result = (x - begin) / delta;
+	assert(result >= 0.0f && result <= 1.f);
+	return result;
+}
+
+// https://easings.net/
+enum TH_Ease {
+	TH_EASE_linear,
+	TH_EASE_cubic_in_out,
+};
+
+static float float_alpha_cubic_in_out(const float& alpha)
+{
+	return (alpha < 0.5f ? 4.f * alpha * alpha * alpha : 1.f - powf(-2.f * alpha + 2.f, 3.f) / 2.f);
+}
+
+static float float_alpha_ease(const float& alpha, const TH_Ease type) {
+	switch (type) {
+	case TH_EASE_linear:
+		return alpha;
+	case TH_EASE_cubic_in_out:
+		return float_alpha_cubic_in_out(alpha);
+	default:
+		SET_HELL_LOOSE(); // not implemented
+		return 0;
+	}
+}
+
+static float float_random_alpha() {
+	return (float)rand() / (float)RAND_MAX;
+}
+
+static float float_random_range(const float& min, const float& max) {
+	float result = float_random_alpha();
+	result = float_lerp(result, min, max);
+	return result;
+}
+
+static float float_alpha_sin_mid(const float& alpha)
+{
+	float sin = alpha;
+	sin = (sinf((alpha - .25f) * 2.f * PI_FLOAT) / 2.f) + 0.5f;
+	return sin;
+}
+
+
+
+#endif

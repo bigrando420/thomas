@@ -74,12 +74,24 @@
     <ClInclude Include="sauce\ext\minicoro.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="sauce\base.h">
+    <ClInclude Include="sauce\th_base.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sauce\thomas.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sauce\anvil.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sauce\th_array.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="sauce\main.cpp">
+    <ClCompile Include="sauce\anvil.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sauce\th_base_internal.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

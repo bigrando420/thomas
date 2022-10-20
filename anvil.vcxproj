@@ -37,8 +37,7 @@
     <IncludePath>$(ProjectDir)sauce;$(VC_IncludePath);C:\Program Files (x86)\Windows Kits\10\Include\10.0.19041.0\ucrt;C:\Program Files (x86)\Windows Kits\10\Include\10.0.19041.0\cppwinrt\winrt;C:\Program Files (x86)\Windows Kits\10\Include\10.0.19041.0\shared;C:\Program Files (x86)\Windows Kits\10\Include\10.0.19041.0\um;C:\Program Files (x86)\Windows Kits\10\Include\10.0.19041.0\winrt</IncludePath>
     <SourcePath>$(ProjectDir)sauce\ext;$(ProjectDir)sauce;$(VC_SourcePath);$(IncludePath)</SourcePath>
     <LibraryPath>C:\Program Files (x86)\Windows Kits\10\Lib\10.0.19041.0\ucrt\x64;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.19041.0\um\x64;$(LibraryPath)</LibraryPath>
-    <NMakeIncludeSearchPath>
-    </NMakeIncludeSearchPath>
+    <NMakeIncludeSearchPath>$(ProjectDir)sauce;$(ProjectDir)sauce\ext</NMakeIncludeSearchPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <BuildLog>
@@ -49,7 +48,9 @@
     <None Include="build.bat" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="sauce\base.h" />
+    <ClInclude Include="sauce\anvil.h" />
+    <ClInclude Include="sauce\th_array.h" />
+    <ClInclude Include="sauce\th_base.h" />
     <ClInclude Include="sauce\ext\cute_c2.h" />
     <ClInclude Include="sauce\ext\fmod\fmod.h" />
     <ClInclude Include="sauce\ext\fmod\fmod_codec.h" />
@@ -68,9 +69,11 @@
     <ClInclude Include="sauce\ext\sokol_gp.h" />
     <ClInclude Include="sauce\ext\sokol_time.h" />
     <ClInclude Include="sauce\ext\stb_image.h" />
+    <ClInclude Include="sauce\thomas.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="sauce\main.cpp" />
+    <ClCompile Include="sauce\anvil.cpp" />
+    <ClCompile Include="sauce\th_base_internal.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
