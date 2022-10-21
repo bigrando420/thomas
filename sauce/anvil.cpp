@@ -19,11 +19,12 @@ static void frame(void) {
 	GameState* gs = game_state();
 	WorldState* world = world_state();
 	Entity*& player = world->player;
-	const vec2i window_size = { sapp_width(), sapp_height() };
+	const vec2 window_size = { (float)sapp_width(), (float)sapp_height() };
 	gs->window_size = window_size;
 	float ratio = window_size.x / (float)window_size.y;
 	float delta_t = sapp_frame_duration();
-	
+	const vec2 world_mouse = mouse_pos_in_worldspace();
+
 	#pragma region Player Input
 	if (gs->key_pressed[SAPP_KEYCODE_SPACE]) {
 		player->vel.y = 300.0f;
@@ -38,21 +39,7 @@ static void frame(void) {
 	player->acc = axis_input * MOVE_SPEED;
 	#pragma endregion
 
-	// BEGIN RENDER
-	sgp_begin(window_size.x, window_size.y);
-	sgp_viewport(0, 0, window_size.x, window_size.y);
-	
-	float project_scale = gs->cam.scale;
-	range2 render_resolution = range2(vec2(window_size.x * -0.5f * project_scale, window_size.y * -0.5f * project_scale), vec2(window_size.x * 0.5f * project_scale, window_size.y * 0.5f * project_scale));
-	sgp_project(render_resolution.min.x, render_resolution.max.x, render_resolution.max.y, render_resolution.min.y);
-
-	// @sgp_helpers - vector expander, so I can use my types
-	sgp_set_blend_mode(SGP_BLENDMODE_BLEND);
-	sgp_set_color(0.1f, 0.1f, 0.1f, 1.0f);
-	sgp_clear();
-
-	#pragma region Particle System
-
+	// Particle Emit
 	for (int i = 0; i < gs->emitters.count; i++) {
 		Emitter* emitter = &gs->emitters[i];
 		
@@ -73,39 +60,7 @@ static void frame(void) {
 		}
 	}
 
-	for (int i = 0; i < gs->particles.max_count; i++) {
-		Particle* particle = &gs->particles[i];
-		if (float_is_zero(particle->life))
-			continue;
-		
-		assert(particle->life > 0.f);
-		particle->life -= delta_t;
-		if (particle->life <= 0.f)
-		{
-			MEMORY_ZERO_STRUCT(particle);
-			continue;
-		}
-
-		particle->pos += particle->vel * delta_t;
-
-		vec2 render_size = vec2(1, 1);
-
-		float alpha = float_alpha(particle->life, particle->start_life, 0.f);
-		alpha = float_alpha_sin_mid(alpha);
-
-		DEFER_LOOP(sgp_push_transform(), sgp_pop_transform()) {
-			sgp_set_color(particle->col.r, particle->col.g, particle->col.b, particle->col.a * alpha);
-			
-			sgp_translate(particle->pos.x, particle->pos.y);
-			camera_apply_transform(gs->cam);
-
-			sgp_draw_filled_rect(render_size.x * -0.5f, render_size.y * -0.5f, render_size.x * 0.5f, render_size.y * 0.5f);
-		}
-	}
-
-	#pragma endregion
-
-	// Physics update
+	// Entity Physics
 	for (int i = 0; i < world->entities.count; i++) {
 		Entity* entity = &world->entities[i];
 		if (!entity->rigid_body)
@@ -126,8 +81,9 @@ static void frame(void) {
 		entity->acc.x = 0;
 		entity->acc.y = 0;
 
-		if (next_pos.y < 0.f) {
-			next_pos.y = 0.f;
+		if (next_pos.y < 0.0f) {
+			next_pos.y = 0.0f;
+			entity->vel.y = 0.0f;
 		}
 
 		entity->pos = next_pos;
@@ -137,10 +93,69 @@ static void frame(void) {
 	gs->cam.pos.x = player->pos.x;
 	gs->cam.pos.y = 20.0f;
 
-	sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
-	sgp_draw_line(-200.f, -20.0f, 200.0f, -20.0f);
+	// BEGIN RENDER
+	sgp_begin(window_size.x, window_size.y);
+	sgp_viewport(0, 0, window_size.x, window_size.y);
 
-	#pragma region Render Entities
+	#if 1
+	sgp_project(window_size.x * -0.5f, window_size.x * 0.5f, window_size.y * 0.5f, window_size.y * -0.5f);
+	sgp_scale(gs->cam.scale, gs->cam.scale);
+	sgp_translate(-gs->cam.pos.x, -gs->cam.pos.y);
+	#else
+	range2 view_rect = { 0 };
+	view_rect.max = vec2(window_size.x, window_size.y);
+	view_rect = range2_center_middle(view_rect);
+	view_rect = range2_shift(view_rect, vec2(0, 100.f));
+	view_rect = range2_scale(view_rect, gs->cam.scale);
+	view_rect = range2_shift(view_rect, gs->cam.pos);
+	sgp_project(view_rect.min.x, view_rect.max.x, view_rect.max.y, view_rect.min.y);
+	#endif
+
+	// @sgp_helpers - vector expander, so I can use my types
+	sgp_set_blend_mode(SGP_BLENDMODE_BLEND);
+	sgp_set_color(0.1f, 0.1f, 0.1f, 1.0f);
+	sgp_clear();
+
+	// SEED
+	if (world->held_seed) {
+		Entity* seed = world->held_seed;
+		seed->pos.x = roundf(world_mouse.x);
+		seed->pos.y = 0.0f;
+
+		sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
+		sgp_draw_line(seed->pos.x, world_mouse.y, seed->pos.x, 0.0f);
+	}
+
+	// Particle Render
+	for (int i = 0; i < gs->particles.max_count; i++) {
+		Particle* particle = &gs->particles[i];
+		if (float_is_zero(particle->life))
+			continue;
+
+		assert(particle->life > 0.f);
+		particle->life -= delta_t;
+		if (particle->life <= 0.f) {
+			MEMORY_ZERO_STRUCT(particle);
+			continue;
+		}
+
+		particle->pos += particle->vel * delta_t;
+
+		float alpha = float_alpha(particle->life, particle->start_life, 0.f);
+		alpha = float_alpha_sin_mid(alpha);
+
+		DEFER_LOOP(sgp_push_transform(), sgp_pop_transform()) {
+			vec2 render_size = vec2(1, 1) * particle->size_mult;
+			sgp_set_color(particle->col.r, particle->col.g, particle->col.b, particle->col.a * alpha);
+			sgp_translate(particle->pos.x, particle->pos.y);
+			sgp_draw_filled_rect(render_size.x * -0.5f, render_size.y * -0.5f, render_size.x, render_size.y);
+		}
+	}
+
+	sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
+	sgp_draw_line(-200.f, 0.0f, 200.0f, 0.0f);
+
+	// Entity Render
 	for (int i = 0; i < world->entities.count; i++) {
 		Entity* entity = &world->entities[i];
 		if (!entity->render)
@@ -149,25 +164,14 @@ static void frame(void) {
 		// @sgp_helpers - transform scope
 		DEFER_LOOP(sgp_push_transform(), sgp_pop_transform()) {
 			range2 rect = entity->bounds;
-			vec2 render_size = range2_size(rect);
-
+			rect = range2_shift(rect, entity->pos);
+			vec2 size = range2_size(rect);
+			
 			sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
-
-			sgp_translate(entity->pos.x, entity->pos.y);
-			camera_apply_transform(gs->cam);
-
-			sgp_draw_filled_rect(rect.min.x, rect.min.y, render_size.x, render_size.y);
+			sgp_draw_filled_rect(rect.min.x, rect.min.y, size.x, size.y);
 			// @sgp_helpers - function for pushing a rang2 rect
 		}
 	}
-	#pragma endregion
-
-	float time = sapp_frame_count() * sapp_frame_duration();
-	float r = sinf(time)*0.5 + 0.5, g = cosf(time)*0.5 + 0.5;
-	//sgp_set_color(r, g, 0.3f, 1.0f);
-	//sgp_rotate_at(time, 0.0f, 0.0f);
-	//sgp_scale(100.0f, 100.f);
-	//sgp_draw_filled_rect(-0.5f, -0.5f, 1.0f, 1.0f);
 
 	sg_pass_action pass_action = { 0 };
 	sg_begin_default_pass(&pass_action, window_size.x, window_size.y);
@@ -184,7 +188,6 @@ static void frame(void) {
 static void init(void) {
 	GameState* gs = game_state();
 	WorldState* world = world_state();
-
 	{
 		// player
 		Entity* entity = world->entities.push();
@@ -193,25 +196,24 @@ static void init(void) {
 		entity->pos.y = 100.0f;
 		entity->rigid_body = 1;
 		entity->render = 1;
-		entity->player = 1;
 		world->player = entity;
 	}
-
 	{
 		// test seed
 		Entity* entity = world->entities.push();
-		entity->pos = vec2(10.0f, 10.0f);
 		entity->bounds.max = vec2(2.0f, 2.0f);
-		entity->bounds = range2_center_middle(entity->bounds);
+		entity->bounds = range2_center_bottom(entity->bounds);
 		entity->render = 1;
-		entity->rigid_body = 1;
+		//entity->rigid_body = 1;
+		world->held_seed = entity;
 	}
-
-	Emitter* emitter = gs->emitters.push();
-	emitter->emit_func = emitter_ambient_screen;
-	emitter->frequency = 10.0f;
-
-	gs->cam.scale = 0.2f;
+	{
+		// background emitter
+		Emitter* emitter = gs->emitters.push();
+		emitter->emit_func = emitter_ambient_screen;
+		emitter->frequency = 10.0f;
+	}
+	gs->cam.scale = DEFAULT_CAMERA_SCALE;
 
 	sg_desc sgdesc = { .context = sapp_sgcontext() };
 	sg_setup(&sgdesc);
@@ -249,9 +251,12 @@ static void event(const sapp_event* ev) {
 		gs->key_down[ev->key_code] = 1;
 	} break;
 	case SAPP_EVENTTYPE_MOUSE_SCROLL: {
-		gs->cam.scale -= ev->scroll_y / 40.0f;
-		gs->cam.scale = CLAMP(0.1f, gs->cam.scale, 1.0f);
+		gs->cam.scale += ev->scroll_y / 8.0f;
+		gs->cam.scale = CLAMP(1.0f, gs->cam.scale, 10.0f);
 	} break;
+	case SAPP_EVENTTYPE_MOUSE_MOVE: {
+		gs->mouse_pos = vec2(ev->mouse_x, ev->mouse_y);
+	};
 	}
 
 	#ifdef FUN_VAL
@@ -269,7 +274,7 @@ sapp_desc sokol_main(int argc, char* argv[]) {
 		.frame_cb = frame,
 		.cleanup_cb = cleanup,
 		.event_cb = event,
-		.sample_count = 4, // Enable anti aliasing.
+		.sample_count = 2,
 		.window_title = APP_NAME,
 	};
 	return test;

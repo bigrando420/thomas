@@ -5,9 +5,10 @@
 #define MOVE_SPEED 2000.0f
 #define PIXEL_SCALE 30.0f
 #define GRAVITY 1000.0f
+#define DEFAULT_CAMERA_SCALE 1.0f
 
 #ifndef TH_SHIP
-#define FUN_VAL
+//#define FUN_VAL
 #endif
 
 typedef struct Emitter Emitter;
@@ -39,20 +40,11 @@ struct Particle
 
 // An ECS made simple. The Megastruct.
 struct Entity {
-
-	// RigidBody "component"
 	vec2 pos;
 	vec2 vel;
 	vec2 acc;
 	range2 bounds;
-
-	// Render "component"
-	// vec2 pos;
-	// range2 render_bounds;
-	// ^ don't even need these, can just reuse the rigid body members
-
-	// flags for which components are active
-	bool player;
+	// flags for which "components" are active
 	bool rigid_body;
 	bool render;
 };
@@ -66,6 +58,7 @@ struct Camera {
 struct WorldState {
 	array_flat<Entity, 64> entities;
 	Entity* player;
+	Entity* held_seed;
 };
 
 struct GameState {
@@ -75,7 +68,8 @@ struct GameState {
 	array_flat<Particle, 2048> particles;
 	Camera cam;
 	// per-frame
-	vec2i window_size;
+	vec2 mouse_pos;
+	vec2 window_size;
 	bool8 key_pressed[SAPP_KEYCODE_MENU];
 	bool8 key_released[SAPP_KEYCODE_MENU];
 };
@@ -115,8 +109,34 @@ PARTICLE_EMITTER_FUNC(emitter_ambient_screen) {
 	particle->size_mult = 1.f;
 }
 
-static void camera_apply_transform(const Camera& cam) {
-	sgp_translate(-cam.pos.x, -cam.pos.y);
+// ideally this is just the inverse of the projection matrix, but I don't have the paitence
+// @camera - construct my own 2x3 camera view matrix and pass it down to sokol_gp somehow by pushing it as a transform?
+// or maybe just push n pop properly? idk
+static vec2 world_pos_to_screen_pos(const vec2& world_pos, const Camera& cam) {
+	GameState* gs = game_state();
+	vec2 result = world_pos;
+	result = result - cam.pos;
+	result.x *= cam.scale;
+	result.y *= cam.scale;
+	result += gs->window_size * 0.5f;
+	result.y = gs->window_size.y - result.y;
+	return result;
+}
+
+static vec2 screen_pos_to_world_pos(const vec2& screen_pos, const Camera& cam) {
+	GameState* gs = game_state();
+	vec2 result = screen_pos;
+	result.y = gs->window_size.y - result.y;
+	result += gs->window_size * -0.5f;
+	result.x /= cam.scale;
+	result.y /= cam.scale;
+	result += cam.pos;
+	return result;
+}
+
+static vec2 mouse_pos_in_worldspace() {
+	GameState* gs = game_state();
+	return screen_pos_to_world_pos(gs->mouse_pos, gs->cam);
 }
 
 #endif

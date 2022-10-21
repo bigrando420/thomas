@@ -211,12 +211,12 @@ static range2 range2_shift(const range2& rng, const vec2& v)
 	return result;
 }
 
+// guarenteed to be positive, even if the min/max is fucked up and back to front
 static vec2 range2_size(const range2& rng)
 {
-	assert(rng.max.x >= rng.min.x && rng.max.y >= rng.min.y);
 	vec2 result;
-	result.x = rng.max.x - rng.min.x;
-	result.y = rng.max.y - rng.min.y;
+	result.x = fabsf(rng.max.x - rng.min.x);
+	result.y = fabsf(rng.max.y - rng.min.y);
 	return result;
 }
 
@@ -300,7 +300,16 @@ static range2 range2_center_middle(const range2& range) {
 	range2 result = range;
 	vec2 size = range2_size(range);
 	result.min.x -= size.x * 0.5f;
+	result.min.y -= size.y * 0.5f;
 	result.max.x -= size.x * 0.5f;
+	result.max.y -= size.y * 0.5f;
+	return result;
+}
+
+static range2 range2_scale(const range2& range, const float& scale) {
+	range2 result = range;
+	result.min = result.min * scale;
+	result.max = result.max * scale;
 	return result;
 }
 
