@@ -288,6 +288,20 @@ static float float_alpha_sin_mid(const float& alpha)
 	return sin;
 }
 
+static range2 range2_center_bottom(const range2& range) {
+	range2 result = range;
+	vec2 size = range2_size(range);
+	result.min.x -= size.x * 0.5f;
+	result.max.x -= size.x * 0.5f;
+	return result;
+}
 
+static range2 range2_center_middle(const range2& range) {
+	range2 result = range;
+	vec2 size = range2_size(range);
+	result.min.x -= size.x * 0.5f;
+	result.max.x -= size.x * 0.5f;
+	return result;
+}
 
 #endif

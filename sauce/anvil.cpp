@@ -26,7 +26,7 @@ static void frame(void) {
 	
 	#pragma region Player Input
 	if (gs->key_pressed[SAPP_KEYCODE_SPACE]) {
-		player->body.vel.y = 300.0f;
+		player->vel.y = 300.0f;
 	}
 	vec2 axis_input = { 0 };
 	if (gs->key_down[SAPP_KEYCODE_A]) {
@@ -35,7 +35,7 @@ static void frame(void) {
 	if (gs->key_down[SAPP_KEYCODE_D]) {
 		axis_input.x += 1.0f;
 	}
-	player->body.acc = axis_input * MOVE_SPEED;
+	player->acc = axis_input * MOVE_SPEED;
 	#pragma endregion
 
 	// BEGIN RENDER
@@ -110,58 +110,57 @@ static void frame(void) {
 		Entity* entity = &world->entities[i];
 		if (!entity->rigid_body)
 			continue;
-		RigidBody* body = &entity->body;
 
 		// acc counter force with existing velocity
-		body->acc.x += -15.0f * body->vel.x;
+		entity->acc.x += -15.0f * entity->vel.x;
 
 		// gravity
-		bool8 falling = body->vel.y < 0.f;
-		body->acc.y -= (falling ? 2.f : 1.f) * GRAVITY;
+		bool8 falling = entity->vel.y < 0.f;
+		entity->acc.y -= (falling ? 2.f : 1.f) * GRAVITY;
 
 		// integrate acceleration and velocity into position
-		vec2 next_pos = 0.5f * body->acc * SQUARE(delta_t) + body->vel * delta_t + body->pos;
+		vec2 next_pos = 0.5f * entity->acc * SQUARE(delta_t) + entity->vel * delta_t + entity->pos;
 
 		// integrate acceleration into velocity
-		body->vel += body->acc * delta_t;
-		body->acc.x = 0;
-		body->acc.y = 0;
+		entity->vel += entity->acc * delta_t;
+		entity->acc.x = 0;
+		entity->acc.y = 0;
 
 		if (next_pos.y < 0.f) {
 			next_pos.y = 0.f;
 		}
 
-		body->pos = next_pos;
+		entity->pos = next_pos;
 	}
 
 	// update camera
-	gs->cam.pos.x = player->body.pos.x;
+	gs->cam.pos.x = player->pos.x;
 	gs->cam.pos.y = 20.0f;
 
 	sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
 	sgp_draw_line(-200.f, -20.0f, 200.0f, -20.0f);
 
-	// render rigid bodies
+	#pragma region Render Entities
 	for (int i = 0; i < world->entities.count; i++) {
 		Entity* entity = &world->entities[i];
-		if (!entity->rigid_body)
+		if (!entity->render)
 			continue;
-		RigidBody* body = &entity->body;
 
 		// @sgp_helpers - transform scope
 		DEFER_LOOP(sgp_push_transform(), sgp_pop_transform()) {
-			range2 rect = body->box;
+			range2 rect = entity->bounds;
 			vec2 render_size = range2_size(rect);
 
 			sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
 
-			sgp_translate(body->pos.x, body->pos.y);
+			sgp_translate(entity->pos.x, entity->pos.y);
 			camera_apply_transform(gs->cam);
 
 			sgp_draw_filled_rect(rect.min.x, rect.min.y, render_size.x, render_size.y);
 			// @sgp_helpers - function for pushing a rang2 rect
 		}
 	}
+	#pragma endregion
 
 	float time = sapp_frame_count() * sapp_frame_duration();
 	float r = sinf(time)*0.5 + 0.5, g = cosf(time)*0.5 + 0.5;
@@ -185,16 +184,27 @@ static void frame(void) {
 static void init(void) {
 	GameState* gs = game_state();
 	WorldState* world = world_state();
+
 	{
-		RigidBody body = { 0 };
-		body.box = range2(vec2(-2.5, 0), vec2(2.5f, 10.0f));
-		body.pos.y = 100.0f;
-		
+		// player
 		Entity* entity = world->entities.push();
-		entity->body = body;
+		entity->bounds.max = vec2(5.0f, 10.0f);
+		entity->bounds = range2_center_bottom(entity->bounds);
+		entity->pos.y = 100.0f;
 		entity->rigid_body = 1;
-		entity->is_player = 1;
+		entity->render = 1;
+		entity->player = 1;
 		world->player = entity;
+	}
+
+	{
+		// test seed
+		Entity* entity = world->entities.push();
+		entity->pos = vec2(10.0f, 10.0f);
+		entity->bounds.max = vec2(2.0f, 2.0f);
+		entity->bounds = range2_center_middle(entity->bounds);
+		entity->render = 1;
+		entity->rigid_body = 1;
 	}
 
 	Emitter* emitter = gs->emitters.push();

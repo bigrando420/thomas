@@ -37,18 +37,24 @@ struct Particle
 	bool8 fade_out;
 };
 
-struct RigidBody {
-	range2 box;
+// An ECS made simple. The Megastruct.
+struct Entity {
+
+	// RigidBody "component"
 	vec2 pos;
 	vec2 vel;
 	vec2 acc;
-};
+	range2 bounds;
 
-struct Entity {
-	RigidBody body;
-	// flags (does c++ auto pack these bools?)
+	// Render "component"
+	// vec2 pos;
+	// range2 render_bounds;
+	// ^ don't even need these, can just reuse the rigid body members
+
+	// flags for which components are active
+	bool player;
 	bool rigid_body;
-	bool is_player;
+	bool render;
 };
 
 struct Camera {
