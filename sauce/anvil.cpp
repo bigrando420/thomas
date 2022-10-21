@@ -12,51 +12,37 @@
 #include <stdlib.h>
 #include <math.h>
 
-/*
-
-## Design Philosophy
-- Keep it (C)imple.
-- Speed is king.
-
-### Why C++ over of C ?
-- operator overloading for common math ops
-- simple templated generics for array<> containers
-- that's literally it.
-
-## Dump
-- [ ] basic memory arenas that don't make use of 64-bit so I can be portable with WASM
-
-*/
-
 #include "thomas.h"
 #include "anvil.h"
 
 static void frame(void) {
+	GameState* gs = game_state();
+	WorldState* world = world_state();
+	Entity*& player = world->player;
 	const vec2i window_size = { sapp_width(), sapp_height() };
-	state->window_size = window_size;
+	gs->window_size = window_size;
 	float ratio = window_size.x / (float)window_size.y;
 	float delta_t = sapp_frame_duration();
-	RigidBody* player = world->player;
-
+	
 	#pragma region Player Input
-	if (state->key_pressed[SAPP_KEYCODE_SPACE]) {
-		player->vel.y = 300.0f;
+	if (gs->key_pressed[SAPP_KEYCODE_SPACE]) {
+		player->body.vel.y = 300.0f;
 	}
 	vec2 axis_input = { 0 };
-	if (state->key_down[SAPP_KEYCODE_A]) {
+	if (gs->key_down[SAPP_KEYCODE_A]) {
 		axis_input.x -= 1.0f;
 	}
-	if (state->key_down[SAPP_KEYCODE_D]) {
+	if (gs->key_down[SAPP_KEYCODE_D]) {
 		axis_input.x += 1.0f;
 	}
-	player->acc = axis_input * MOVE_SPEED;
+	player->body.acc = axis_input * MOVE_SPEED;
 	#pragma endregion
 
 	// BEGIN RENDER
 	sgp_begin(window_size.x, window_size.y);
 	sgp_viewport(0, 0, window_size.x, window_size.y);
 	
-	float project_scale = state->cam.scale;
+	float project_scale = gs->cam.scale;
 	range2 render_resolution = range2(vec2(window_size.x * -0.5f * project_scale, window_size.y * -0.5f * project_scale), vec2(window_size.x * 0.5f * project_scale, window_size.y * 0.5f * project_scale));
 	sgp_project(render_resolution.min.x, render_resolution.max.x, render_resolution.max.y, render_resolution.min.y);
 
@@ -67,8 +53,8 @@ static void frame(void) {
 
 	#pragma region Particle System
 
-	for (int i = 0; i < state->emitters.count; i++) {
-		Emitter* emitter = &state->emitters[i];
+	for (int i = 0; i < gs->emitters.count; i++) {
+		Emitter* emitter = &gs->emitters[i];
 		
 		float freq_remainder = emitter->frequency - floorf(emitter->frequency);
 		bool8 remainder = 0;
@@ -77,18 +63,18 @@ static void frame(void) {
 
 		uint32 emit_amount = floorf(emitter->frequency) + remainder;
 		for (int j = 0; j < emit_amount; j++) {
-			state->particles.count++;
-			if (state->particles.count == state->particles.max_count)
-				state->particles.count = 0;
-			Particle* new_particle = &state->particles[state->particles.count];
+			gs->particles.count++;
+			if (gs->particles.count == gs->particles.max_count)
+				gs->particles.count = 0;
+			Particle* new_particle = &gs->particles[gs->particles.count];
 			if (!float_is_zero(new_particle->life))
 				LOG("warning: particles are being overridden");
 			emitter->emit_func(new_particle, emitter);
 		}
 	}
 
-	for (int i = 0; i < state->particles.max_count; i++) {
-		Particle* particle = &state->particles[i];
+	for (int i = 0; i < gs->particles.max_count; i++) {
+		Particle* particle = &gs->particles[i];
 		if (float_is_zero(particle->life))
 			continue;
 		
@@ -111,7 +97,7 @@ static void frame(void) {
 			sgp_set_color(particle->col.r, particle->col.g, particle->col.b, particle->col.a * alpha);
 			
 			sgp_translate(particle->pos.x, particle->pos.y);
-			camera_apply_transform(state->cam);
+			camera_apply_transform(gs->cam);
 
 			sgp_draw_filled_rect(render_size.x * -0.5f, render_size.y * -0.5f, render_size.x * 0.5f, render_size.y * 0.5f);
 		}
@@ -120,8 +106,11 @@ static void frame(void) {
 	#pragma endregion
 
 	// Physics update
-	for (int i = 0; i < world->rigid_bodies.count; i++) {
-		RigidBody* body = &world->rigid_bodies[i];
+	for (int i = 0; i < world->entities.count; i++) {
+		Entity* entity = &world->entities[i];
+		if (!entity->rigid_body)
+			continue;
+		RigidBody* body = &entity->body;
 
 		// acc counter force with existing velocity
 		body->acc.x += -15.0f * body->vel.x;
@@ -146,11 +135,18 @@ static void frame(void) {
 	}
 
 	// update camera
-	state->cam.pos.x = player->pos.x;
+	gs->cam.pos.x = player->body.pos.x;
+	gs->cam.pos.y = 20.0f;
+
+	sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
+	sgp_draw_line(-200.f, -20.0f, 200.0f, -20.0f);
 
 	// render rigid bodies
-	for (int i = 0; i < world->rigid_bodies.count; i++) {
-		RigidBody* body = &world->rigid_bodies[i];
+	for (int i = 0; i < world->entities.count; i++) {
+		Entity* entity = &world->entities[i];
+		if (!entity->rigid_body)
+			continue;
+		RigidBody* body = &entity->body;
 
 		// @sgp_helpers - transform scope
 		DEFER_LOOP(sgp_push_transform(), sgp_pop_transform()) {
@@ -160,7 +156,7 @@ static void frame(void) {
 			sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
 
 			sgp_translate(body->pos.x, body->pos.y);
-			camera_apply_transform(state->cam);
+			camera_apply_transform(gs->cam);
 
 			sgp_draw_filled_rect(rect.min.x, rect.min.y, render_size.x, render_size.y);
 			// @sgp_helpers - function for pushing a rang2 rect
@@ -182,22 +178,30 @@ static void frame(void) {
 	sg_commit();
 
 	// clear press and release events
-	memset(&state->key_pressed, 0, sizeof(state->key_pressed));
-	memset(&state->key_released, 0, sizeof(state->key_pressed));
+	memset(&gs->key_pressed, 0, sizeof(gs->key_pressed));
+	memset(&gs->key_released, 0, sizeof(gs->key_pressed));
 }
 
 static void init(void) {
-	RigidBody player = { 0 };
-	player.box = range2(vec2(0, 0), vec2(5.0f, 10.0f));
-	player.pos.y = 100.0f;
-	state->world.player = world->rigid_bodies.push(player);
+	GameState* gs = game_state();
+	WorldState* world = world_state();
+	{
+		RigidBody body = { 0 };
+		body.box = range2(vec2(-2.5, 0), vec2(2.5f, 10.0f));
+		body.pos.y = 100.0f;
+		
+		Entity* entity = world->entities.push();
+		entity->body = body;
+		entity->rigid_body = 1;
+		entity->is_player = 1;
+		world->player = entity;
+	}
 
-	Emitter emitter = { 0 };
-	emitter.emit_func = emitter_ambient_screen;
-	emitter.frequency = 10.0f;
-	state->emitters.push(emitter);
+	Emitter* emitter = gs->emitters.push();
+	emitter->emit_func = emitter_ambient_screen;
+	emitter->frequency = 10.0f;
 
-	state->cam.scale = 0.2f;
+	gs->cam.scale = 0.2f;
 
 	sg_desc sgdesc = { .context = sapp_sgcontext() };
 	sg_setup(&sgdesc);
@@ -220,24 +224,31 @@ static void cleanup(void) {
 }
 
 static void event(const sapp_event* ev) {
+	GameState* gs = game_state();
 	switch (ev->type) {
 	case SAPP_EVENTTYPE_KEY_UP: {
-		bool8 already_up = !state->key_down[ev->key_code];
+		bool8 already_up = !gs->key_down[ev->key_code];
 		if (!already_up)
-			state->key_released[ev->key_code] = 1;
-		state->key_down[ev->key_code] = 0;
+			gs->key_released[ev->key_code] = 1;
+		gs->key_down[ev->key_code] = 0;
 	} break;
 	case SAPP_EVENTTYPE_KEY_DOWN: {
-		bool8 already_down = state->key_down[ev->key_code];
+		bool8 already_down = gs->key_down[ev->key_code];
 		if (!already_down)
-			state->key_pressed[ev->key_code] = 1;
-		state->key_down[ev->key_code] = 1;
+			gs->key_pressed[ev->key_code] = 1;
+		gs->key_down[ev->key_code] = 1;
+	} break;
+	case SAPP_EVENTTYPE_MOUSE_SCROLL: {
+		gs->cam.scale -= ev->scroll_y / 40.0f;
+		gs->cam.scale = CLAMP(0.1f, gs->cam.scale, 1.0f);
 	} break;
 	}
 
-	fun_val = float_map(ev->mouse_y, 0, state->window_size.y, -10.f, 10.f);
-	fun_val *= float_map(ev->mouse_x, 0, state->window_size.x, 0.00001f, 100.f);
+	#ifdef FUN_VAL
+	fun_val = float_map(ev->mouse_y, 0, gs->window_size.y, -10.f, 10.f);
+	fun_val *= float_map(ev->mouse_x, 0, gs->window_size.x, 0.00001f, 100.f);
 	LOG("%f", fun_val);
+	#endif
 }
 
 sapp_desc sokol_main(int argc, char* argv[]) {

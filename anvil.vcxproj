@@ -50,7 +50,7 @@
   <ItemGroup>
     <ClInclude Include="sauce\anvil.h" />
     <ClInclude Include="sauce\th_array.h" />
-    <ClInclude Include="sauce\th_base.h" />
+    <ClInclude Include="sauce\th_dump.h" />
     <ClInclude Include="sauce\ext\cute_c2.h" />
     <ClInclude Include="sauce\ext\fmod\fmod.h" />
     <ClInclude Include="sauce\ext\fmod\fmod_codec.h" />
@@ -70,10 +70,11 @@
     <ClInclude Include="sauce\ext\sokol_time.h" />
     <ClInclude Include="sauce\ext\stb_image.h" />
     <ClInclude Include="sauce\thomas.h" />
+    <ClInclude Include="sauce\th_memory.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="sauce\anvil.cpp" />
-    <ClCompile Include="sauce\th_base_internal.cpp" />
+    <ClCompile Include="sauce\thomas_internal.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

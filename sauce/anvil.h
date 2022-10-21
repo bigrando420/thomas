@@ -6,6 +6,10 @@
 #define PIXEL_SCALE 30.0f
 #define GRAVITY 1000.0f
 
+#ifndef TH_SHIP
+#define FUN_VAL
+#endif
+
 typedef struct Emitter Emitter;
 typedef struct Particle Particle;
 typedef void (*ParticleEmitterFunc)(Particle*, Emitter*);
@@ -40,6 +44,13 @@ struct RigidBody {
 	vec2 acc;
 };
 
+struct Entity {
+	RigidBody body;
+	// flags (does c++ auto pack these bools?)
+	bool rigid_body;
+	bool is_player;
+};
+
 struct Camera {
 	vec2 pos;
 	float scale;
@@ -47,12 +58,12 @@ struct Camera {
 };
 
 struct WorldState {
-	array_flat<RigidBody, 128> rigid_bodies;
-	RigidBody* player;
+	array_flat<Entity, 64> entities;
+	Entity* player;
 };
 
-struct AppState {
-	WorldState world;
+struct GameState {
+	WorldState world_state;
 	bool8 key_down[SAPP_KEYCODE_MENU];
 	array_flat<Emitter, 16> emitters;
 	array_flat<Particle, 2048> particles;
@@ -62,17 +73,27 @@ struct AppState {
 	bool8 key_pressed[SAPP_KEYCODE_MENU];
 	bool8 key_released[SAPP_KEYCODE_MENU];
 };
-static AppState app_state = { 0 };
-static AppState* state = &app_state;
-static WorldState* world = &app_state.world;
 
+// wrapped globals, will be trivial to swap out later
+static GameState* game_state() {
+	static GameState gs = { 0 };
+	return &gs;
+}
+static WorldState* world_state() {
+	GameState* gs = game_state();
+	return &gs->world_state;
+}
+
+#ifdef FUN_VAL
 static float fun_val = 0.0f;
+#endif
 
 static range2 camera_get_bounds() {
+	GameState* gs = game_state();
 	// todo - @camera
 	range2 cam = { 0 };
-	cam.max = vec2((int)state->window_size.x, (int)state->window_size.y);
-	cam = range2_shift(cam, vec2((int)state->window_size.x, (int)state->window_size.y) * -0.5f);
+	cam.max = vec2((int)gs->window_size.x, (int)gs->window_size.y);
+	cam = range2_shift(cam, vec2((int)gs->window_size.x, (int)gs->window_size.y) * -0.5f);
 	return cam;
 }
 

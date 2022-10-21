@@ -28,7 +28,8 @@
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define CLAMP_UPPER(a, b) MIN(a, b)
 #define CLAMP_LOWER(a, b) MAX(a, b)
-#define CLAMP(minimum, x, maximum)  
+#define CLAMP(minimum, x, maximum) (((minimum)>(x))?(minimum):((maximum)<(x))?(maximum):(x))
+#define SIGN(x) (((x) > 0) - ((x) < 0))
 
 #define SQUARE(a) ((a) * (a))
 
