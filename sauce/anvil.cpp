@@ -32,9 +32,11 @@ static void frame(void) {
 	vec2 axis_input = { 0 };
 	if (gs->key_down[SAPP_KEYCODE_A]) {
 		axis_input.x -= 1.0f;
+		world->player->flip_horizontal = 1;
 	}
 	if (gs->key_down[SAPP_KEYCODE_D]) {
 		axis_input.x += 1.0f;
+		world->player->flip_horizontal = 0;
 	}
 	player->acc = axis_input * MOVE_SPEED;
 	#pragma endregion
@@ -161,17 +163,41 @@ static void frame(void) {
 		if (!entity->render)
 			continue;
 
-		// @sgp_helpers - transform scope
-		DEFER_LOOP(sgp_push_transform(), sgp_pop_transform()) {
-			range2 rect = entity->bounds;
-			rect = range2_shift(rect, entity->pos);
-			vec2 size = range2_size(rect);
+		for (int j = 0; j < entity->render_rects.count; j++) {
+			RenderRect* render = &entity->render_rects[j];
 			
-			sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
-			sgp_draw_filled_rect(rect.min.x, rect.min.y, size.x, size.y);
-			// @sgp_helpers - function for pushing a rang2 rect
+			range2 rect = render->rect;
+			if (entity->flip_horizontal) {
+				rect.min.x *= -1.0f;
+				rect.max.x *= -1.0f;
+				float temp = rect.min.x;
+				rect.min.x = rect.max.x;
+				rect.max.x = temp;
+			}
+			rect = range2_shift(rect, entity->pos);
+
+			// draw rect
+			vec2 pos = rect.min;
+			vec2 size = range2_size(rect);
+			sgp_set_color(V4_EXPAND(render->col));
+			sgp_draw_filled_rect(pos.x, pos.y, size.x, size.y);
 		}
 	}
+
+	#ifdef RENDER_COLLIDERS
+	for (int i = 0; i < world->entities.count; i++) {
+		Entity* entity = &world->entities[i];
+		if (!entity->rigid_body)
+			continue;
+		range2 rect = entity->bounds;
+		rect = range2_shift(rect, entity->pos);
+		sgp_set_color(RENDER_COLLIDER_COLOR);
+		sgp_draw_line(rect.min.x, rect.min.y, rect.min.x, rect.max.y);
+		sgp_draw_line(rect.min.x, rect.min.y, rect.max.x, rect.min.y);
+		sgp_draw_line(rect.max.x, rect.max.y, rect.min.x, rect.max.y);
+		sgp_draw_line(rect.max.x, rect.max.y, rect.max.x, rect.min.y);
+	}
+	#endif
 
 	sg_pass_action pass_action = { 0 };
 	sg_begin_default_pass(&pass_action, window_size.x, window_size.y);
@@ -191,12 +217,17 @@ static void init(void) {
 	{
 		// player
 		Entity* entity = world->entities.push();
+		world->player = entity;
 		entity->bounds.max = vec2(5.0f, 10.0f);
 		entity->bounds = range2_center_bottom(entity->bounds);
 		entity->pos.y = 100.0f;
 		entity->rigid_body = 1;
 		entity->render = 1;
-		world->player = entity;
+		entity_render_rect_from_bounds(entity, TH_WHITE);
+		RenderRect* eye = entity->render_rects.push();
+		eye->col = TH_BLACK;
+		eye->rect.max = vec2(1, 1);
+		eye->rect = range2_shift(eye->rect, vec2(1.0f, 8.0f));
 	}
 	{
 		// test seed
@@ -205,6 +236,7 @@ static void init(void) {
 		entity->bounds = range2_center_bottom(entity->bounds);
 		entity->render = 1;
 		//entity->rigid_body = 1;
+		entity_render_rect_from_bounds(entity, TH_WHITE);
 		world->held_seed = entity;
 	}
 	{

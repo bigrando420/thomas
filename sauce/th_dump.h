@@ -33,6 +33,8 @@
 
 #define SQUARE(a) ((a) * (a))
 
+#define V4_EXPAND(vec) vec.x, vec.y, vec.z, vec.w
+
 #define PI_FLOAT (3.1415926535897f)
 
 #define MEMORY_ZERO_STRUCT(struct_ptr) memset(struct_ptr, 0, sizeof(*(struct_ptr)))

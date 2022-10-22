@@ -3,6 +3,8 @@
 
 // This is literally the main reason why I switched to using C++
 
+//#define FLAT_EACH(arr) 
+
 template <typename T, uint32 max_count_in>
 struct array_flat {
 	uint32 count;

@@ -9,7 +9,13 @@
 
 #ifndef TH_SHIP
 //#define FUN_VAL
+//#define RENDER_COLLIDERS
+#define RENDER_COLLIDER_COLOR 1.0f, 0.5f, 0.5f, 1.0f
 #endif
+
+// helpers
+#define TH_BLACK vec4(0.0f, 0.0f, 0.0f, 1.0f)
+#define TH_WHITE vec4(1.0f, 1.0f, 1.0f, 1.0f)
 
 typedef struct Emitter Emitter;
 typedef struct Particle Particle;
@@ -38,12 +44,19 @@ struct Particle
 	bool8 fade_out;
 };
 
+struct RenderRect {
+	range2 rect;
+	vec4 col;
+};
+
 // An ECS made simple. The Megastruct.
 struct Entity {
 	vec2 pos;
 	vec2 vel;
 	vec2 acc;
 	range2 bounds;
+	array_flat<RenderRect, 8> render_rects;
+	bool8 flip_horizontal;
 	// flags for which "components" are active
 	bool rigid_body;
 	bool render;
@@ -137,6 +150,12 @@ static vec2 screen_pos_to_world_pos(const vec2& screen_pos, const Camera& cam) {
 static vec2 mouse_pos_in_worldspace() {
 	GameState* gs = game_state();
 	return screen_pos_to_world_pos(gs->mouse_pos, gs->cam);
+}
+
+static void entity_render_rect_from_bounds(Entity* entity, const vec4& col) {
+	RenderRect* render = entity->render_rects.push();
+	render->rect = entity->bounds;
+	render->col = col;
 }
 
 #endif
