@@ -4,7 +4,7 @@ SRC_POSTFIX := cpp
 SRC_PATH := sauce
 BUILD_PATH := build
 LIBS = opengl x11 xcursor xi
-FLAGS = -Wall -Wpedantic -ldl
+FLAGS = -Wall -Wpedantic -ldl -pthread
 CCFLAGS = ${FLAGS}
 LDFLAGS = ${FLAGS}
 
