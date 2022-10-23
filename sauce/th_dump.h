@@ -6,9 +6,8 @@
 #define SET_HELL_LOOSE() (*(int*)0 = 0)
 #define ENABLE_ASSERT
 #ifdef ENABLE_ASSERT
-#undef assert
 // TODO - inject this into the libraries above so I can override
-#define assert(condition) if (!(condition)) { SET_HELL_LOOSE(); }
+#define Assert(condition) if (!(condition)) { SET_HELL_LOOSE(); }
 #else
 #define assert(condition)
 #endif
@@ -247,7 +246,7 @@ static float float_alpha(const float& x, const float& begin, const float& end) {
 		return begin;
 	float delta = end - begin;
 	float result = (x - begin) / delta;
-	assert(result >= 0.0f && result <= 1.f);
+	Assert(result >= 0.0f && result <= 1.f);
 	return result;
 }
 

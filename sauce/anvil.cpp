@@ -12,6 +12,9 @@
 #define HANDMADE_MATH_IMPLEMENTATION
 #include "ext/HandmadeMath.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "ext/stb_image.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -139,7 +142,7 @@ static void frame(void) {
 		if (float_is_zero(particle->life))
 			continue;
 
-		assert(particle->life > 0.f);
+		Assert(particle->life > 0.f);
 		particle->life -= delta_t;
 		if (particle->life <= 0.f) {
 			MEMORY_ZERO_STRUCT(particle);
@@ -185,7 +188,11 @@ static void frame(void) {
 			vec2 pos = rect.min;
 			vec2 size = range2_size(rect);
 			sgp_set_color(V4_EXPAND(render->col));
+			if (render->img)
+				sgp_set_image(0, render->img->image);
 			sgp_draw_filled_rect(pos.x, pos.y, size.x, size.y);
+			if (render->img)
+				sgp_unset_image(0);
 		}
 	}
 
@@ -217,8 +224,24 @@ static void frame(void) {
 }
 
 static void init(void) {
+	sg_desc sgdesc = { .context = sapp_sgcontext() };
+	sg_setup(&sgdesc);
+	if (!sg_isvalid()) {
+		fprintf(stderr, "Failed to create Sokol GFX context!\n");
+		exit(-1);
+	}
+
+	sgp_desc sgpdesc = { 0 };
+	sgp_setup(&sgpdesc);
+	if (!sgp_is_valid()) {
+		fprintf(stderr, "Failed to create Sokol GP context: %s\n", sgp_get_error_message(sgp_get_last_error()));
+		exit(-1);
+	}
+
+	// ENTRY
 	GameState* gs = game_state();
 	WorldState* world = world_state();
+	th_load_image("plant.png");
 	{
 		// player
 		Entity* entity = world->entities.push();
@@ -245,26 +268,21 @@ static void init(void) {
 		world->held_seed = entity;
 	}
 	{
+		// test seed
+		Entity* entity = world->entities.push();
+		entity->bounds.max = vec2(128, 64);
+		entity->bounds = range2_center_bottom(entity->bounds);
+		entity->render = 1;
+		entity_render_rect_from_bounds(entity, TH_WHITE);
+		entity->render_rects[0].img = th_image_from_string("plant.png");
+	}
+	{
 		// background emitter
 		Emitter* emitter = gs->emitters.push();
 		emitter->emit_func = emitter_ambient_screen;
 		emitter->frequency = 10.0f;
 	}
 	gs->cam.scale = DEFAULT_CAMERA_SCALE;
-
-	sg_desc sgdesc = { .context = sapp_sgcontext() };
-	sg_setup(&sgdesc);
-	if (!sg_isvalid()) {
-		fprintf(stderr, "Failed to create Sokol GFX context!\n");
-		exit(-1);
-	}
-
-	sgp_desc sgpdesc = { 0 };
-	sgp_setup(&sgpdesc);
-	if (!sgp_is_valid()) {
-		fprintf(stderr, "Failed to create Sokol GP context: %s\n", sgp_get_error_message(sgp_get_last_error()));
-		exit(-1);
-	}
 }
 
 static void cleanup(void) {
