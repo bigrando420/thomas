@@ -68,8 +68,14 @@ struct Camera {
 	float rotation;
 };
 
+struct Image {
+	char name[128];
+	sg_image image;
+};
+
 struct WorldState {
 	array_flat<Entity, 64> entities;
+	Entity entties[64];
 	Entity* player;
 	Entity* held_seed;
 };
@@ -80,6 +86,7 @@ struct GameState {
 	array_flat<Emitter, 16> emitters;
 	array_flat<Particle, 2048> particles;
 	Camera cam;
+	array_flat<Image, 64> images;
 	// per-frame
 	vec2 mouse_pos;
 	vec2 window_size;
@@ -156,6 +163,52 @@ static void entity_render_rect_from_bounds(Entity* entity, const vec4& col) {
 	RenderRect* render = entity->render_rects.push();
 	render->rect = entity->bounds;
 	render->col = col;
+}
+
+static uint32 c_string_length(const char* string) {
+	const char* cursor = string;
+	while (cursor[0] != '\0') {
+		cursor++;
+	}
+	uint32 length = cursor - string;
+	return length;
+}
+
+static uint32 hash_from_string(const char* string) {
+	uint32 result = 5381;
+	uint32 string_size = c_string_length(string);
+	for (int i = 0; i < string_size; i++) {
+		result = ((result << 5) + result) + string[i];
+	}
+	return result;
+}
+
+static Image* texture_from_string(const char* string) {
+	GameState* gs = game_state();
+	for (int i = 0; i < gs->images.count; i++) {
+		Image* texture = &gs->images[i];
+		if (strcmp(texture->name, string) == 0) {
+			return texture;
+		}
+	}
+	Assert(0); // no texture found :(
+	return 0;
+}
+
+static void th_load_image(const char* name) {
+	GameState* gs = game_state();
+	int x, y, comp;
+	uint8* data = stbi_load(name, &x, &y, &comp, 0);
+	Assert(data);
+	sg_range range = { data, x * y * 4 * sizeof(char) };
+	sg_image_desc desc = { 0 };
+	desc.width = x;
+	desc.height = y;
+	desc.data.subimage[0][0] = range;
+	Image* image = gs->images.push();
+	image->image = sg_make_image(desc);
+	strcpy(image->name, name);
+	stbi_image_free(data);
 }
 
 #endif

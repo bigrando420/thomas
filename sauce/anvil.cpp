@@ -8,6 +8,9 @@
 #define HANDMADE_MATH_IMPLEMENTATION
 #include "ext/HandmadeMath.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "ext/stb_image.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -134,7 +137,7 @@ static void frame(void) {
 		if (float_is_zero(particle->life))
 			continue;
 
-		assert(particle->life > 0.f);
+		Assert(particle->life > 0.f);
 		particle->life -= delta_t;
 		if (particle->life <= 0.f) {
 			MEMORY_ZERO_STRUCT(particle);
@@ -212,6 +215,21 @@ static void frame(void) {
 }
 
 static void init(void) {
+	sg_desc sgdesc = { .context = sapp_sgcontext() };
+	sg_setup(&sgdesc);
+	if (!sg_isvalid()) {
+		fprintf(stderr, "Failed to create Sokol GFX context!\n");
+		exit(-1);
+	}
+
+	sgp_desc sgpdesc = { 0 };
+	sgp_setup(&sgpdesc);
+	if (!sgp_is_valid()) {
+		fprintf(stderr, "Failed to create Sokol GP context: %s\n", sgp_get_error_message(sgp_get_last_error()));
+		exit(-1);
+	}
+
+	// ENTRY
 	GameState* gs = game_state();
 	WorldState* world = world_state();
 	{
@@ -247,19 +265,7 @@ static void init(void) {
 	}
 	gs->cam.scale = DEFAULT_CAMERA_SCALE;
 
-	sg_desc sgdesc = { .context = sapp_sgcontext() };
-	sg_setup(&sgdesc);
-	if (!sg_isvalid()) {
-		fprintf(stderr, "Failed to create Sokol GFX context!\n");
-		exit(-1);
-	}
-
-	sgp_desc sgpdesc = { 0 };
-	sgp_setup(&sgpdesc);
-	if (!sgp_is_valid()) {
-		fprintf(stderr, "Failed to create Sokol GP context: %s\n", sgp_get_error_message(sgp_get_last_error()));
-		exit(-1);
-	}
+	th_load_image("plant.png");
 }
 
 static void cleanup(void) {

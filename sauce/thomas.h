@@ -11,10 +11,12 @@
 ### Why C++ over of C ?
 - operator overloading for common math ops
 - simple templated generics for array<> containers
-- that's literally it. 95% of the codebase can be compiled into C
+- that's literally it.
 
 ## Dump
 - [ ] basic memory arenas that don't make use of 64-bit so I can be portable with WASM
+- [ ] change TH_NamingConventionBackToThis
+- [ ] custom string types + operations
 
 */
 
