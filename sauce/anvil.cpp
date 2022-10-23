@@ -26,6 +26,11 @@
 static void frame(void) {
 	GameState* gs = game_state();
 	WorldState* world = world_state();
+	if (gs->key_pressed[SAPP_KEYCODE_B]) {
+		MEMORY_ZERO_STRUCT(world);
+		th_world_init(world);
+	}
+
 	Entity*& player = world->player;
 	const vec2 window_size = { (float)sapp_width(), (float)sapp_height() };
 	gs->window_size = window_size;
@@ -33,24 +38,25 @@ static void frame(void) {
 	float delta_t = sapp_frame_duration();
 	const vec2 world_mouse = mouse_pos_in_worldspace();
 
-	#pragma region Player Input
-	if (gs->key_pressed[SAPP_KEYCODE_SPACE]) {
-		player->vel.y = 300.0f;
+	// PLAYER INPUT
+	if (world->player) {
+		if (gs->key_pressed[SAPP_KEYCODE_SPACE]) {
+			player->vel.y = 300.0f;
+		}
+		vec2 axis_input = { 0 };
+		if (gs->key_down[SAPP_KEYCODE_A]) {
+			axis_input.x -= 1.0f;
+			world->player->flip_horizontal = 1;
+		}
+		if (gs->key_down[SAPP_KEYCODE_D]) {
+			axis_input.x += 1.0f;
+			world->player->flip_horizontal = 0;
+		}
+		player->acc = axis_input * MOVE_SPEED;
 	}
-	vec2 axis_input = { 0 };
-	if (gs->key_down[SAPP_KEYCODE_A]) {
-		axis_input.x -= 1.0f;
-		world->player->flip_horizontal = 1;
-	}
-	if (gs->key_down[SAPP_KEYCODE_D]) {
-		axis_input.x += 1.0f;
-		world->player->flip_horizontal = 0;
-	}
-	player->acc = axis_input * MOVE_SPEED;
-	#pragma endregion
 
 	// Particle Emit
-	for (int i = 0; i < gs->emitters.count; i++) {
+	for (int i = 0; i < gs->emitter_count; i++) {
 		Emitter* emitter = &gs->emitters[i];
 		
 		float freq_remainder = emitter->frequency - floorf(emitter->frequency);
@@ -60,10 +66,10 @@ static void frame(void) {
 
 		uint32 emit_amount = floorf(emitter->frequency) + remainder;
 		for (int j = 0; j < emit_amount; j++) {
-			gs->particles.count++;
-			if (gs->particles.count == gs->particles.max_count)
-				gs->particles.count = 0;
-			Particle* new_particle = &gs->particles[gs->particles.count];
+			gs->particle_count++;
+			if (gs->particle_count == ArrayCount(gs->particles))
+				gs->particle_count = 0;
+			Particle* new_particle = &gs->particles[gs->particle_count];
 			if (!float_is_zero(new_particle->life))
 				LOG("warning: particles are being overridden");
 			emitter->emit_func(new_particle, emitter);
@@ -71,7 +77,7 @@ static void frame(void) {
 	}
 
 	// Entity Physics
-	for (int i = 0; i < world->entities.count; i++) {
+	for (int i = 0; i < world->entity_count; i++) {
 		Entity* entity = &world->entities[i];
 		if (!entity->rigid_body)
 			continue;
@@ -100,8 +106,10 @@ static void frame(void) {
 	}
 
 	// update camera
-	gs->cam.pos.x = player->pos.x;
-	gs->cam.pos.y = 20.0f;
+	if (world->player) {
+		gs->cam.pos.x = player->pos.x;
+		gs->cam.pos.y = 20.0f;
+	}
 
 	// BEGIN RENDER
 	sgp_begin(window_size.x, window_size.y);
@@ -134,10 +142,33 @@ static void frame(void) {
 
 		sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
 		sgp_draw_line(seed->pos.x, world_mouse.y, seed->pos.x, 0.0f);
+
+		if (gs->mouse_pressed[SAPP_MOUSEBUTTON_LEFT]) {
+			Entity* plant = th_entity_create_plant();
+			plant->pos = seed->pos;
+		}
+	}
+
+	// PLANT UPDATE
+	for (int i = 0; i < world->entity_count; i++) {
+		Entity* entity = &world->entities[i];
+		if (!entity->plant)
+			continue;
+
+		entity->plant_stage += delta_t * 4.f;
+		if (entity->plant_stage > 7.999f) {
+			entity->plant_stage = 8.0f;
+		}
+
+		uint8 stage = floorf(entity->plant_stage);
+		stage = CLAMP_UPPER(stage, 6);
+		Sprite* plant = th_texture_sprite_get("plant0");
+		plant += stage;
+		entity->render_rects[0].sprite = plant;
 	}
 
 	// Particle Render
-	for (int i = 0; i < gs->particles.max_count; i++) {
+	for (int i = 0; i < ArrayCount(gs->particles); i++) {
 		Particle* particle = &gs->particles[i];
 		if (float_is_zero(particle->life))
 			continue;
@@ -166,12 +197,12 @@ static void frame(void) {
 	sgp_draw_line(-200.f, 0.0f, 200.0f, 0.0f);
 
 	// Entity Render
-	for (int i = 0; i < world->entities.count; i++) {
+	for (int i = 0; i < world->entity_count; i++) {
 		Entity* entity = &world->entities[i];
 		if (!entity->render)
 			continue;
 
-		for (int j = 0; j < entity->render_rects.count; j++) {
+		for (int j = 0; j < entity->render_rect_count; j++) {
 			RenderRect* render = &entity->render_rects[j];
 			
 			range2 rect = render->rect;
@@ -185,14 +216,17 @@ static void frame(void) {
 			rect = range2_shift(rect, entity->pos);
 
 			// draw rect
-			vec2 pos = rect.min;
-			vec2 size = range2_size(rect);
 			sgp_set_color(V4_EXPAND(render->col));
-			if (render->img)
-				sgp_set_image(0, render->img->image);
-			sgp_draw_filled_rect(pos.x, pos.y, size.x, size.y);
-			if (render->img)
+			if (render->sprite) {
+				Assert(render->sprite->atlas); // invalid atlas
+				sgp_set_image(0, render->sprite->atlas->image);
+				sgp_draw_textured_rect_ex(0, range2_to_sgp_rect(rect), range2_to_sgp_rect(render->sprite->sub_rect));
 				sgp_unset_image(0);
+			} else {
+				// this is the price you pay for using other people's libraries (a worthwhile trade off in this case (for now))
+				sgp_rect icky_rect = range2_to_sgp_rect(rect);
+				sgp_draw_filled_rect(icky_rect.x, icky_rect.y, icky_rect.w, icky_rect.h);
+			}
 		}
 	}
 
@@ -220,7 +254,9 @@ static void frame(void) {
 
 	// clear press and release events
 	memset(&gs->key_pressed, 0, sizeof(gs->key_pressed));
-	memset(&gs->key_released, 0, sizeof(gs->key_pressed));
+	memset(&gs->key_released, 0, sizeof(gs->key_released));
+	memset(&gs->mouse_pressed, 0, sizeof(gs->mouse_pressed));
+	memset(&gs->mouse_released, 0, sizeof(gs->mouse_released));
 }
 
 static void init(void) {
@@ -241,48 +277,38 @@ static void init(void) {
 	// ENTRY
 	GameState* gs = game_state();
 	WorldState* world = world_state();
-	th_load_image("plant.png");
-	{
-		// player
-		Entity* entity = world->entities.push();
-		world->player = entity;
-		entity->bounds.max = vec2{5.0f, 10.0f};
-		entity->bounds = range2_center_bottom(entity->bounds);
-		entity->pos.y = 100.0f;
-		entity->rigid_body = 1;
-		entity->render = 1;
-		entity_render_rect_from_bounds(entity, TH_WHITE);
-		RenderRect* eye = entity->render_rects.push();
-		eye->col = TH_BLACK;
-		eye->rect.max = vec2{1, 1};
-		eye->rect = range2_shift(eye->rect, vec2{1.0f, 8.0f});
-	}
-	{
-		// test seed
-		Entity* entity = world->entities.push();
-		entity->bounds.max = vec2{2.0f, 2.0f};
-		entity->bounds = range2_center_bottom(entity->bounds);
-		entity->render = 1;
-		//entity->rigid_body = 1;
-		entity_render_rect_from_bounds(entity, TH_WHITE);
-		world->held_seed = entity;
-	}
-	{
-		// test seed
-		Entity* entity = world->entities.push();
-		entity->bounds.max = vec2(128, 64);
-		entity->bounds = range2_center_bottom(entity->bounds);
-		entity->render = 1;
-		entity_render_rect_from_bounds(entity, TH_WHITE);
-		entity->render_rects[0].img = th_image_from_string("plant.png");
-	}
+	Atlas* plants = th_texture_atlas_load("plant.png");
+	range2 plant_sub_rect = range2(vec2(), vec2(16, 64));
+	th_texture_sprite_create(plants, "plant0", plant_sub_rect);
+	plant_sub_rect = range2_shift(plant_sub_rect, vec2(16, 0));
+	th_texture_sprite_create(plants, "plant1", plant_sub_rect);
+	plant_sub_rect = range2_shift(plant_sub_rect, vec2(16, 0));
+	th_texture_sprite_create(plants, "plant2", plant_sub_rect);
+	plant_sub_rect = range2_shift(plant_sub_rect, vec2(16, 0));
+	th_texture_sprite_create(plants, "plant3", plant_sub_rect);
+	plant_sub_rect = range2_shift(plant_sub_rect, vec2(16, 0));
+	th_texture_sprite_create(plants, "plant4", plant_sub_rect);
+	plant_sub_rect = range2_shift(plant_sub_rect, vec2(16, 0));
+	th_texture_sprite_create(plants, "plant5", plant_sub_rect);
+	plant_sub_rect = range2_shift(plant_sub_rect, vec2(16, 0));
+	th_texture_sprite_create(plants, "plant6", plant_sub_rect);
+	plant_sub_rect = range2_shift(plant_sub_rect, vec2(16, 0));
+	th_texture_sprite_create(plants, "plant7", plant_sub_rect);
+
+	plant_sub_rect = range2_shift(plant_sub_rect, vec2(16, 0));
+	plant_sub_rect.max = plant_sub_rect.min;
+	plant_sub_rect.max += vec2(4, 4);
+	th_texture_sprite_create(plants, "resource1", plant_sub_rect);
 	{
 		// background emitter
-		Emitter* emitter = gs->emitters.push();
+		Emitter* emitter = TH_ARRAY_PUSH(gs->emitters, gs->emitter_count);
 		emitter->emit_func = emitter_ambient_screen;
 		emitter->frequency = 10.0f;
 	}
+
 	gs->cam.scale = DEFAULT_CAMERA_SCALE;
+
+	th_world_init(world);
 }
 
 static void cleanup(void) {
@@ -304,6 +330,18 @@ static void event(const sapp_event* ev) {
 		if (!already_down)
 			gs->key_pressed[ev->key_code] = 1;
 		gs->key_down[ev->key_code] = 1;
+	} break;
+	case SAPP_EVENTTYPE_MOUSE_UP: {
+		bool8 already_up = !gs->mouse_down[ev->mouse_button];
+		if (!already_up)
+			gs->mouse_released[ev->mouse_button] = 1;
+		gs->mouse_down[ev->mouse_button] = 0;
+	} break;
+	case SAPP_EVENTTYPE_MOUSE_DOWN: {
+		bool8 already_down = gs->mouse_down[ev->mouse_button];
+		if (!already_down)
+			gs->mouse_pressed[ev->mouse_button] = 1;
+		gs->mouse_down[ev->mouse_button] = 1;
 	} break;
 	case SAPP_EVENTTYPE_MOUSE_SCROLL: {
 		gs->cam.scale += ev->scroll_y / 8.0f;
