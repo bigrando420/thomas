@@ -1,4 +1,8 @@
+#ifdef _WIN32
 #define SOKOL_D3D11
+#elif __linux__
+#define SOKOL_GLCORE33
+#endif
 #define SOKOL_IMPL
 #include "ext/sokol_gfx.h"
 #include "ext/sokol_gp.h"
