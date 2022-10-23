@@ -12,9 +12,10 @@
 #define assert(condition)
 #endif
 
+#define OutputDebugString(_str) puts(_str)
 #define PRINT_STRING(_str) OutputDebugString(_str)
 // @string - if you overrun this with a long string, you will die.
-#define LOG(_str, ...) {char output[256] = { 0 }; sprintf(output, _str"\n", __VA_ARGS__); PRINT_STRING(output);}
+#define LOG(_str, ...) {char output[256] = { 0 }; sprintf(output, _str"\n", ##__VA_ARGS__); PRINT_STRING(output);}
 
 #define STRINGIFY(str) #str
 #define GLUE(a, b) a##b
