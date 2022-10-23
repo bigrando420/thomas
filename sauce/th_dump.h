@@ -19,7 +19,7 @@
 #define STRINGIFY(str) #str
 #define GLUE(a, b) a##b
 
-#define ARRAY_COUNT(a) (sizeof(a) / sizeof(*(a)))
+#define ArrayCount(a) (sizeof(a) / sizeof(*(a)))
 #define DEFER_LOOP(start, end) for (int _i_ = ((start), 0); _i_ == 0; _i_++, (end))
 // ^ trick from the goat ryan fleury. Useful for wrapping open/close pairs into a scope
 

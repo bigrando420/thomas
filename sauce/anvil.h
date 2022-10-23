@@ -44,14 +44,20 @@ struct Particle
 	bool8 fade_out;
 };
 
-struct Image {
+struct Atlas {
 	char name[128];
 	sg_image image;
 };
 
+struct Sprite {
+	char name[128];
+	Atlas* atlas;
+	range2 sub_rect;
+};
+
 struct RenderRect {
 	range2 rect;
-	Image* img;
+	Sprite* sprite;
 	vec4 col;
 };
 
@@ -61,11 +67,13 @@ struct Entity {
 	vec2 vel;
 	vec2 acc;
 	range2 bounds;
-	array_flat<RenderRect, 8> render_rects;
+	RenderRect render_rects[8];
+	uint32 render_rect_count;
 	bool8 flip_horizontal;
-	// flags for which "components" are active
+	float plant_stage;
 	bool rigid_body;
 	bool render;
+	bool plant;
 };
 
 struct Camera {
@@ -75,8 +83,8 @@ struct Camera {
 };
 
 struct WorldState {
-	array_flat<Entity, 64> entities;
-	Entity entties[64];
+	Entity entities[64];
+	uint32 entity_count;
 	Entity* player;
 	Entity* held_seed;
 };
@@ -84,15 +92,23 @@ struct WorldState {
 struct GameState {
 	WorldState world_state;
 	bool8 key_down[SAPP_KEYCODE_MENU];
-	array_flat<Emitter, 16> emitters;
-	array_flat<Particle, 2048> particles;
+	bool8 mouse_down[SAPP_MOUSEBUTTON_MIDDLE];
+	Emitter emitters[16];
+	uint32 emitter_count;
+	Particle particles[2048];
+	uint32 particle_count;
 	Camera cam;
-	array_flat<Image, 64> images;
+	Atlas atlases[16];
+	uint32 atlas_count;
+	Sprite sprites[64];
+	uint32 sprite_count;
 	// per-frame
 	vec2 mouse_pos;
 	vec2 window_size;
 	bool8 key_pressed[SAPP_KEYCODE_MENU];
 	bool8 key_released[SAPP_KEYCODE_MENU];
+	bool8 mouse_pressed[SAPP_MOUSEBUTTON_MIDDLE];
+	bool8 mouse_released[SAPP_MOUSEBUTTON_MIDDLE];
 };
 
 // wrapped globals, will be trivial to swap out later
@@ -160,12 +176,6 @@ static vec2 mouse_pos_in_worldspace() {
 	return screen_pos_to_world_pos(gs->mouse_pos, gs->cam);
 }
 
-static void entity_render_rect_from_bounds(Entity* entity, const vec4& col) {
-	RenderRect* render = entity->render_rects.push();
-	render->rect = entity->bounds;
-	render->col = col;
-}
-
 static uint32 c_string_length(const char* string) {
 	const char* cursor = string;
 	while (cursor[0] != '\0') {
@@ -184,10 +194,10 @@ static uint32 hash_from_string(const char* string) {
 	return result;
 }
 
-static Image* th_image_from_string(const char* string) {
+static Atlas* th_image_from_string(const char* string) {
 	GameState* gs = game_state();
-	for (int i = 0; i < gs->images.count; i++) {
-		Image* texture = &gs->images[i];
+	for (int i = 0; i < gs->atlas_count; i++) {
+		Atlas* texture = &gs->atlases[i];
 		if (strcmp(texture->name, string) == 0) {
 			return texture;
 		}
@@ -196,7 +206,7 @@ static Image* th_image_from_string(const char* string) {
 	return 0;
 }
 
-static void th_load_image(const char* name) {
+static Atlas* th_texture_atlas_load(const char* name) {
 	GameState* gs = game_state();
 	int x, y, comp;
 	stbi_set_flip_vertically_on_load(1);
@@ -207,10 +217,96 @@ static void th_load_image(const char* name) {
 	desc.width = x;
 	desc.height = y;
 	desc.data.subimage[0][0] = range;
-	Image* image = gs->images.push();
-	image->image = sg_make_image(desc);
-	strcpy(image->name, name);
+	Atlas* atlas = TH_ARRAY_PUSH(gs->atlases, gs->atlas_count);
+	atlas->image = sg_make_image(desc);
+	strcpy(atlas->name, name);
 	stbi_image_free(data);
+	return atlas;
+}
+
+static sgp_rect range2_to_sgp_rect(range2 range) {
+	sgp_rect result = { 0 };
+	vec2 size = range2_size(range);
+	result.x = range.min.x;
+	result.y = range.min.y;
+	result.w = size.x;
+	result.h = size.y;
+	return result;
+}
+
+static Sprite* th_texture_sprite_create(Atlas* atlas, const char* name, range2 sub_rect) {
+	GameState* gs = game_state();
+	Sprite* sprite = TH_ARRAY_PUSH(gs->sprites, gs->sprite_count);
+	sprite->atlas = atlas;
+	sprite->sub_rect = sub_rect;
+	strcpy(sprite->name, name);
+	return sprite;
+}
+
+static Sprite* th_texture_sprite_get(const char* name) {
+	GameState* gs = game_state();
+	for (int i = 0; i < gs->sprite_count; i++) {
+		Sprite* sprite = &gs->sprites[i];
+		if (strcmp(sprite->name, name) == 0) {
+			return sprite;
+		}
+	}
+	Assert(0);
+	return 0;
+}
+
+static Entity* th_entity_create_plant() {
+	WorldState* world = world_state();
+	Entity* entity = TH_ARRAY_PUSH(world->entities, world->entity_count);
+	entity->render = 1;
+	entity->plant = 1;
+	RenderRect* render = TH_ARRAY_PUSH(entity->render_rects, entity->render_rect_count);
+	render->rect.max = vec2(16.0f, 64.0f);
+	render->rect = range2_center_bottom(render->rect);
+	render->col = TH_WHITE;
+	return entity;
+}
+
+static void th_world_init(WorldState* world) {
+	{
+		// player
+		Entity* entity = TH_ARRAY_PUSH(world->entities, world->entity_count);
+		world->player = entity;
+		entity->bounds.max = vec2(5.0f, 10.0f);
+		entity->bounds = range2_center_bottom(entity->bounds);
+		entity->pos.y = 100.0f;
+		entity->rigid_body = 1;
+		entity->render = 1;
+		RenderRect* render = TH_ARRAY_PUSH(entity->render_rects, entity->render_rect_count);
+		render->rect = entity->bounds;
+		render->col = TH_WHITE;
+		RenderRect* eye = TH_ARRAY_PUSH(entity->render_rects, entity->render_rect_count);
+		eye->col = TH_BLACK;
+		eye->rect.max = vec2(1, 1);
+		eye->rect = range2_shift(eye->rect, vec2(1.0f, 8.0f));
+	}
+	{
+		// test seed
+		Entity* entity = TH_ARRAY_PUSH(world->entities, world->entity_count);
+		entity->bounds.max = vec2(2.0f, 2.0f);
+		entity->bounds = range2_center_bottom(entity->bounds);
+		entity->render = 1;
+		//entity->rigid_body = 1;
+		RenderRect* render = TH_ARRAY_PUSH(entity->render_rects, entity->render_rect_count);
+		render->rect = entity->bounds;
+		render->col = TH_WHITE;
+		world->held_seed = entity;
+	}
+	{
+		Entity* entity = TH_ARRAY_PUSH(world->entities, world->entity_count);
+		entity->bounds.max = vec2(4.0f, 4.0f);
+		entity->bounds = range2_center_bottom(entity->bounds);
+		entity->render = 1;
+		RenderRect* render = TH_ARRAY_PUSH(entity->render_rects, entity->render_rect_count);
+		render->rect = entity->bounds;
+		render->col = TH_WHITE;
+		render->sprite = th_texture_sprite_get("resource1");
+	}
 }
 
 #endif
