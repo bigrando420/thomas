@@ -44,8 +44,14 @@ struct Particle
 	bool8 fade_out;
 };
 
+struct Image {
+	char name[128];
+	sg_image image;
+};
+
 struct RenderRect {
 	range2 rect;
+	Image* img;
 	vec4 col;
 };
 
@@ -66,11 +72,6 @@ struct Camera {
 	vec2 pos;
 	float scale;
 	float rotation;
-};
-
-struct Image {
-	char name[128];
-	sg_image image;
 };
 
 struct WorldState {
@@ -183,7 +184,7 @@ static uint32 hash_from_string(const char* string) {
 	return result;
 }
 
-static Image* texture_from_string(const char* string) {
+static Image* th_image_from_string(const char* string) {
 	GameState* gs = game_state();
 	for (int i = 0; i < gs->images.count; i++) {
 		Image* texture = &gs->images[i];
@@ -198,6 +199,7 @@ static Image* texture_from_string(const char* string) {
 static void th_load_image(const char* name) {
 	GameState* gs = game_state();
 	int x, y, comp;
+	stbi_set_flip_vertically_on_load(1);
 	uint8* data = stbi_load(name, &x, &y, &comp, 0);
 	Assert(data);
 	sg_range range = { data, x * y * 4 * sizeof(char) };

@@ -183,7 +183,11 @@ static void frame(void) {
 			vec2 pos = rect.min;
 			vec2 size = range2_size(rect);
 			sgp_set_color(V4_EXPAND(render->col));
+			if (render->img)
+				sgp_set_image(0, render->img->image);
 			sgp_draw_filled_rect(pos.x, pos.y, size.x, size.y);
+			if (render->img)
+				sgp_unset_image(0);
 		}
 	}
 
@@ -232,6 +236,7 @@ static void init(void) {
 	// ENTRY
 	GameState* gs = game_state();
 	WorldState* world = world_state();
+	th_load_image("plant.png");
 	{
 		// player
 		Entity* entity = world->entities.push();
@@ -258,14 +263,21 @@ static void init(void) {
 		world->held_seed = entity;
 	}
 	{
+		// test seed
+		Entity* entity = world->entities.push();
+		entity->bounds.max = vec2(128, 64);
+		entity->bounds = range2_center_bottom(entity->bounds);
+		entity->render = 1;
+		entity_render_rect_from_bounds(entity, TH_WHITE);
+		entity->render_rects[0].img = th_image_from_string("plant.png");
+	}
+	{
 		// background emitter
 		Emitter* emitter = gs->emitters.push();
 		emitter->emit_func = emitter_ambient_screen;
 		emitter->frequency = 10.0f;
 	}
 	gs->cam.scale = DEFAULT_CAMERA_SCALE;
-
-	th_load_image("plant.png");
 }
 
 static void cleanup(void) {
