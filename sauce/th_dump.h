@@ -1,5 +1,5 @@
 #ifndef TH_BASE_H
-#define BASE_H
+#define TH_BASE_H
 
 // thx to Big Al for the inspiration - https://www.youtube.com/watch?v=6_AvIAlKhG8&list=PLT6InxK-XQvNKTyLXk6H6KKy12UYS_KDL&index=2
 
@@ -13,9 +13,10 @@
 #define assert(condition)
 #endif
 
+#define OutputDebugString(_str) fputs(_str, stdout)
 #define PRINT_STRING(_str) OutputDebugString(_str)
 // @string - if you overrun this with a long string, you will die.
-#define LOG(_str, ...) {char output[256] = { 0 }; sprintf(output, _str"\n", __VA_ARGS__); PRINT_STRING(output);}
+#define LOG(_str, ...) {char output[256] = { 0 }; sprintf(output, _str"\n", ##__VA_ARGS__); PRINT_STRING(output);}
 
 #define STRINGIFY(str) #str
 #define GLUE(a, b) a##b

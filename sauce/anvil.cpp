@@ -1,4 +1,8 @@
+#ifdef __linux__
+#define SOKOL_GLCORE33
+#elif _WIN32
 #define SOKOL_D3D11
+#endif
 #define SOKOL_IMPL
 #include "ext/sokol_gfx.h"
 #include "ext/sokol_gp.h"
@@ -11,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <stdarg.h>
 
 #include "thomas.h"
 #include "anvil.h"
@@ -147,7 +152,7 @@ static void frame(void) {
 		alpha = float_alpha_sin_mid(alpha);
 
 		DEFER_LOOP(sgp_push_transform(), sgp_pop_transform()) {
-			vec2 render_size = vec2(1, 1) * particle->size_mult;
+			vec2 render_size = vec2{1, 1} * particle->size_mult;
 			sgp_set_color(particle->col.r, particle->col.g, particle->col.b, particle->col.a * alpha);
 			sgp_translate(particle->pos.x, particle->pos.y);
 			sgp_draw_filled_rect(render_size.x * -0.5f, render_size.y * -0.5f, render_size.x, render_size.y);
@@ -218,7 +223,7 @@ static void init(void) {
 		// player
 		Entity* entity = world->entities.push();
 		world->player = entity;
-		entity->bounds.max = vec2(5.0f, 10.0f);
+		entity->bounds.max = vec2{5.0f, 10.0f};
 		entity->bounds = range2_center_bottom(entity->bounds);
 		entity->pos.y = 100.0f;
 		entity->rigid_body = 1;
@@ -226,13 +231,13 @@ static void init(void) {
 		entity_render_rect_from_bounds(entity, TH_WHITE);
 		RenderRect* eye = entity->render_rects.push();
 		eye->col = TH_BLACK;
-		eye->rect.max = vec2(1, 1);
-		eye->rect = range2_shift(eye->rect, vec2(1.0f, 8.0f));
+		eye->rect.max = vec2{1, 1};
+		eye->rect = range2_shift(eye->rect, vec2{1.0f, 8.0f});
 	}
 	{
 		// test seed
 		Entity* entity = world->entities.push();
-		entity->bounds.max = vec2(2.0f, 2.0f);
+		entity->bounds.max = vec2{2.0f, 2.0f};
 		entity->bounds = range2_center_bottom(entity->bounds);
 		entity->render = 1;
 		//entity->rigid_body = 1;
@@ -287,7 +292,7 @@ static void event(const sapp_event* ev) {
 		gs->cam.scale = CLAMP(1.0f, gs->cam.scale, 10.0f);
 	} break;
 	case SAPP_EVENTTYPE_MOUSE_MOVE: {
-		gs->mouse_pos = vec2(ev->mouse_x, ev->mouse_y);
+		gs->mouse_pos = vec2{ev->mouse_x, ev->mouse_y};
 	};
 	}
 
