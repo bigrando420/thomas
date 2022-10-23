@@ -14,8 +14,8 @@
 #endif
 
 // helpers
-#define TH_BLACK vec4{0.0f, 0.0f, 0.0f, 1.0f}
-#define TH_WHITE vec4{1.0f, 1.0f, 1.0f, 1.0f}
+#define TH_BLACK vec4(0.0f, 0.0f, 0.0f, 1.0f)
+#define TH_WHITE vec4(1.0f, 1.0f, 1.0f, 1.0f)
 
 typedef struct Emitter Emitter;
 typedef struct Particle Particle;
@@ -129,8 +129,8 @@ static range2 camera_get_bounds() {
 	GameState* gs = game_state();
 	// todo - @camera
 	range2 cam = { 0 };
-	cam.max = vec2{gs->window_size.x, gs->window_size.y};
-	cam = range2_shift(cam, vec2{gs->window_size.x, gs->window_size.y} * -0.5f);
+	cam.max = vec2((int)gs->window_size.x, (int)gs->window_size.y);
+	cam = range2_shift(cam, vec2((int)gs->window_size.x, (int)gs->window_size.y) * -0.5f);
 	return cam;
 }
 
@@ -138,8 +138,8 @@ PARTICLE_EMITTER_FUNC(emitter_ambient_screen) {
 	range2 bounds = camera_get_bounds();
 	particle->pos.x = float_random_range(bounds.min.x, bounds.max.x);
 	particle->pos.y = float_random_range(bounds.min.y, bounds.max.y);
-	particle->vel = vec2{float_random_range(-1.f, 1.f), float_random_range(2.f, 4.f)};
-	particle->col = vec4{0.7f, 0.7f, 0.7f, 1.0f};
+	particle->vel = vec2(float_random_range(-1.f, 1.f), float_random_range(2.f, 4.f));
+	particle->col = vec4(0.7f, 0.7f, 0.7f, 1.0f);
 	particle->start_life = particle->life = 2.f;
 	particle->fade_in = 1;
 	particle->fade_out = 1;

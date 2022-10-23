@@ -1,8 +1,4 @@
-#ifdef __linux__
-#define SOKOL_GLCORE33
-#elif _WIN32
 #define SOKOL_D3D11
-#endif
 #define SOKOL_IMPL
 #include "ext/sokol_gfx.h"
 #include "ext/sokol_gp.h"
@@ -18,7 +14,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <stdarg.h>
 
 #include "thomas.h"
 #include "anvil.h"
@@ -186,7 +181,7 @@ static void frame(void) {
 		alpha = float_alpha_sin_mid(alpha);
 
 		DEFER_LOOP(sgp_push_transform(), sgp_pop_transform()) {
-			vec2 render_size = vec2{1, 1} * particle->size_mult;
+			vec2 render_size = vec2(1, 1) * particle->size_mult;
 			sgp_set_color(particle->col.r, particle->col.g, particle->col.b, particle->col.a * alpha);
 			sgp_translate(particle->pos.x, particle->pos.y);
 			sgp_draw_filled_rect(render_size.x * -0.5f, render_size.y * -0.5f, render_size.x, render_size.y);
@@ -348,7 +343,7 @@ static void event(const sapp_event* ev) {
 		gs->cam.scale = CLAMP(1.0f, gs->cam.scale, 10.0f);
 	} break;
 	case SAPP_EVENTTYPE_MOUSE_MOVE: {
-		gs->mouse_pos = vec2{ev->mouse_x, ev->mouse_y};
+		gs->mouse_pos = vec2(ev->mouse_x, ev->mouse_y);
 	};
 	}
 
