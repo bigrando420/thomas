@@ -5,8 +5,8 @@
 #define SOKOL_GLCORE33
 #endif
 #define SOKOL_IMPL
-
 #define SOKOL_LOG(msg) PRINT_STRING(msg)
+
 #include "thomas.h"
 #include "ext/sokol_gfx.h"
 #include "ext/sokol_gp.h"
