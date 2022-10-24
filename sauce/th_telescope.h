@@ -9,6 +9,17 @@ function B8 Overlap2F32(Rng2F32 a, Rng2F32 b)
 	return (inter.min.x < inter.max.x && inter.min.y < inter.max.y);
 }
 
+function Rng2F32 Flip2F32(Rng2F32 r)
+{
+	Rng2F32 result = r;
+	result.min.x *= -1.0f;
+	result.max.x *= -1.0f;
+	F32 temp = result.min.x;
+	result.min.x = result.max.x;
+	result.max.x = temp;
+	return result;
+}
+
 // MATH OPERATOR OVERLOADS
 function Vec2 operator*(F32 scale, Vec2 vec)
 {

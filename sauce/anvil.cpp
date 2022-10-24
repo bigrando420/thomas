@@ -48,11 +48,11 @@ static void frame(void) {
 		Vec2 axis_input = { 0 };
 		if (gs->key_down[SAPP_KEYCODE_A]) {
 			axis_input.x -= 1.0f;
-			world->player->flip_horizontal = 1;
+			world->player->x_dir = -1;
 		}
 		if (gs->key_down[SAPP_KEYCODE_D]) {
 			axis_input.x += 1.0f;
-			world->player->flip_horizontal = 0;
+			world->player->x_dir = 1;
 		}
 		player->acc = axis_input * MOVE_SPEED;
 	}
@@ -84,7 +84,7 @@ static void frame(void) {
 			continue;
 
 		// acc counter force with existing velocity
-		entity->acc.x += -15.0f * entity->vel.x;
+		entity->acc.x += -entity->x_friction_mult * entity->vel.x;
 
 		// gravity
 		B8 falling = entity->vel.y < 0.f;
@@ -137,15 +137,16 @@ static void frame(void) {
 		// player interact
 		Rng2F32 interact_rect = { 0 };
 		interact_rect.max = Vec2(20, 20);
-		interact_rect = range2_center_left(interact_rect);
+		if (player->x_dir == -1)
+			interact_rect = Flip2F32(interact_rect);
+		//interact_rect = range2_center_left(interact_rect);
 		interact_rect = Shift2F32(interact_rect, player->pos);
 		sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
 		sgp_draw_debug_rect_lines(interact_rect);
 
 		// does interact_rect overlap with any interactable entities?
 		Entity* selected_entity = 0;
-		ForEach(entity, world->entities, Entity*)
-		{
+		ForEach(entity, world->entities, Entity*) {
 			if (!entity->interactable || entity->id == world->held_entity_id)
 				continue;
 
@@ -154,53 +155,75 @@ static void frame(void) {
 			}
 		}
 
-		if (selected_entity) {
+		if (selected_entity && !EntityFromID(world->held_entity_id)) {
 			selected_entity->frame.render_highlight = 1; // can pick up feedback
 
-			if (gs->key_pressed[SAPP_KEYCODE_E]) {
+			if (gs->key_pressed[SAPP_KEYCODE_E]) { // PICKUP
 				world->held_entity_id = selected_entity->id;
+				gs->key_pressed[SAPP_KEYCODE_E] = 0;
 			}
 		}
-	}
 
-	// ENTITY HOLDING
-	{
-		Entity* entity = EntityFromID(world->held_entity_id);
-		if (entity) {
-			if (entity->seed) { // SEED PLACEMENT
-				entity->pos.x = roundf(world_mouse.x);
-				entity->pos.y = 0.0f;
+		Entity* held_entity = EntityFromID(world->held_entity_id);
+		if (held_entity) {
+			if (held_entity->seed) { // SEED PLACEMENT
+				held_entity->pos.x = roundf(world_mouse.x);
+				held_entity->pos.y = 0.0f;
 
 				sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
-				sgp_draw_line(entity->pos.x, world_mouse.y, entity->pos.x, 0.0f);
+				sgp_draw_line(held_entity->pos.x, world_mouse.y, held_entity->pos.x, 0.0f);
 
 				if (gs->mouse_pressed[SAPP_MOUSEBUTTON_LEFT]) {
 					Entity* plant = th_entity_create_plant();
-					plant->pos = entity->pos;
-					EntityDestroy(entity);
+					plant->pos = held_entity->pos;
+					EntityDestroy(held_entity);
 				}
-			}
-			else {
-				// todo - snap to player hands
+			} else {
+				held_entity->vel = player->vel;
+				held_entity->pos = player->pos;
+				held_entity->pos.x += 7.0f * player->x_dir;
+				held_entity->pos.y += 10.0f;
+				if (gs->key_pressed[SAPP_KEYCODE_E]) { // THROW
+					world->held_entity_id = 0;
+					held_entity->vel.x += player->x_dir * 100.0f;
+					held_entity->rigid_body = 1;
+				}
 			}
 		}
 	}
 
 	// PLANT UPDATE
-	ForEach(entity, world->entities, Entity*) {
-		if (!entity->plant)
+	ForEach(plant, world->entities, Entity*) {
+		if (!plant->plant)
 			continue;
 
-		entity->plant_stage += delta_t * 4.f;
-		if (entity->plant_stage > 7.999f) {
-			entity->plant_stage = 8.0f;
+		const S8 final_stage = 6;
+
+		S8 previous_stage = floorf(plant->plant_stage);
+		plant->plant_stage += delta_t * 4.f;
+		if (plant->plant_stage > (F32)final_stage + 0.999f) {
+			plant->plant_stage = (F32)final_stage + 0.999f; // lol
 		}
 
-		U8 stage = floorf(entity->plant_stage);
-		stage = ClampTop(stage, 6);
-		Sprite* plant = th_texture_sprite_get("plant0");
-		plant += stage;
-		entity->sprite = plant;
+		S8 stage = floorf(plant->plant_stage);
+		stage = ClampTop(stage, final_stage);
+		Sprite* plant_sprite = th_texture_sprite_get("plant0");
+		plant_sprite += stage;
+		plant->sprite = plant_sprite;
+		
+		if (stage != previous_stage && stage == final_stage) {
+			// @tooling - some kind of handle information from the sprite? maybe like a red pixel, or create another layer on information on top? Ideally I'd like to have another application running in the background where I can author this data.
+			Entity* res_a = EntityCreateResource();
+			res_a->pos = plant->pos;
+			res_a->pos.y += 13;
+			res_a->pos.x += -4;
+			res_a->rigid_body = 0;
+			Entity* res_b = EntityCreateResource();
+			res_b->pos = plant->pos;
+			res_b->pos.y += 36;
+			res_b->pos.x += 6;
+			res_b->rigid_body = 0;
+		}
 	}
 
 	// Particle Render
@@ -244,8 +267,8 @@ static void frame(void) {
 		if (entity->sprite) {
 			Assert(entity->sprite->atlas); // invalid atlas
 			sgp_rect target_rect = range2_to_sgp_rect(rect);
-			sgp_rect src_rect = range2_to_sgp_rect(entity->sprite->sub_rect);
-			if (entity->flip_horizontal) {
+			sgp_rect src_rect = range2_to_sgp_rect(Pad2F32(entity->sprite->sub_rect, -0.1f)); // todo - fix this texture bleeding issue without padding it in
+			if (entity->x_dir == -1) {
 				target_rect.x += target_rect.w;
 				target_rect.w *= -1;
 			}
@@ -330,7 +353,7 @@ static void init(void) {
 	sub_rect.max += Vec2(4, 4);
 	th_texture_sprite_create(atlas, "resource1", sub_rect);
 	// player
-	sub_rect.min = Vec2(144, 0);
+	sub_rect.min = Vec2(16 * 10, 0);
 	sub_rect.max = sub_rect.min + Vec2(16, 32);
 	th_texture_sprite_create(atlas, "arcane_player", sub_rect);
 

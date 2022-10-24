@@ -2,7 +2,7 @@
 #define ANVIL_H
 
 #define APP_NAME "Game C"
-#define MOVE_SPEED 1000.0f
+#define MOVE_SPEED 2000.0f
 #define PIXEL_SCALE 30.0f
 #define GRAVITY 1000.0f
 #define DEFAULT_CAMERA_SCALE 5.0f
@@ -69,11 +69,12 @@ struct Entity {
 	Vec2 vel;
 	Vec2 acc;
 	Rng2F32 bounds;
+	B8 x_friction_mult;
 	B8 render;
 	Rng2F32 render_rect;
 	Sprite* sprite;
 	Vec4 col;
-	B8 flip_horizontal;
+	B8 x_dir;
 	B8 plant;
 	F32 plant_stage;
 	B8 interactable;
@@ -140,6 +141,7 @@ function Entity* EntityCreate() {
 		}
 	}
 	Assert(0); // no more free entities :(
+	return 0;
 }
 
 function void EntityDestroy(Entity* entity) {
@@ -147,6 +149,8 @@ function void EntityDestroy(Entity* entity) {
 }
 
 function Entity* EntityFromID(U32 id) {
+	if (id == 0)
+		return 0;
 	WorldState* world = world_state();
 	ForEach(entity, world->entities, Entity*) {
 		if (entity->id == id) {
@@ -306,6 +310,19 @@ static Entity* th_entity_create_plant() {
 	return entity;
 }
 
+function Entity* EntityCreateResource() {
+	WorldState* world = world_state();
+	Entity* entity = EntityCreate();
+	entity->sprite = th_texture_sprite_get("resource1");
+	th_entity_set_bounds_from_sprite(entity);
+	entity->render = 1;
+	entity->interactable = 1;
+	entity->rigid_body = 1;
+	entity->x_friction_mult = 4.0f;
+	entity->col = TH_WHITE;
+	return entity;
+}
+
 static void th_world_init(WorldState* world) {
 	{
 		// player
@@ -316,6 +333,7 @@ static void th_world_init(WorldState* world) {
 		entity->pos.y = 100.0f;
 		entity->rigid_body = 1;
 		entity->render = 1;
+		entity->x_friction_mult = 15.0f;
 		entity->col = TH_WHITE;
 	}
 	{
@@ -333,13 +351,8 @@ static void th_world_init(WorldState* world) {
 	}
 	{
 		// test resource
-		Entity* entity = EntityCreate();
-		entity->sprite = th_texture_sprite_get("resource1");
-		th_entity_set_bounds_from_sprite(entity);
+		Entity* entity = EntityCreateResource();
 		entity->pos.x = 100.0f;
-		entity->render = 1;
-		entity->interactable = 1;
-		entity->col = TH_WHITE;
 	}
 }
 
