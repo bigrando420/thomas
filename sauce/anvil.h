@@ -2,10 +2,10 @@
 #define ANVIL_H
 
 #define APP_NAME "Game C"
-#define MOVE_SPEED 2000.0f
+#define MOVE_SPEED 1000.0f
 #define PIXEL_SCALE 30.0f
 #define GRAVITY 1000.0f
-#define DEFAULT_CAMERA_SCALE 1.0f
+#define DEFAULT_CAMERA_SCALE 5.0f
 
 #ifndef TH_SHIP
 //#define FUN_VAL
@@ -62,6 +62,7 @@ struct EntityFrame {
 };
 
 struct Entity {
+	U32 id;
 	EntityFrame frame; // per-frame data, zeroed out at the start of each frame
 	B8 rigid_body;
 	Vec2 pos;
@@ -76,6 +77,7 @@ struct Entity {
 	B8 plant;
 	F32 plant_stage;
 	B8 interactable;
+	B8 seed;
 };
 
 struct Camera {
@@ -86,9 +88,9 @@ struct Camera {
 
 struct WorldState {
 	Entity entities[64];
-	U32 entity_count;
+	U32 last_entity_id;
 	Entity* player;
-	Entity* held_seed;
+	U32 held_entity_id;
 };
 
 struct GameState {
@@ -126,6 +128,33 @@ static WorldState* world_state() {
 #ifdef FUN_VAL
 static F32 fun_val = 0.0f;
 #endif
+
+function Entity* EntityCreate() {
+	WorldState* world = world_state();
+	Assert(world->last_entity_id + 1 < U32Max); // todo - more sophisticated IDs
+	world->last_entity_id++;
+	ForEach(entity, world->entities, Entity*) {
+		if (!entity->id) {
+			entity->id = world->last_entity_id;
+			return entity;
+		}
+	}
+	Assert(0); // no more free entities :(
+}
+
+function void EntityDestroy(Entity* entity) {
+	MemoryZeroStruct(entity);
+}
+
+function Entity* EntityFromID(U32 id) {
+	WorldState* world = world_state();
+	ForEach(entity, world->entities, Entity*) {
+		if (entity->id == id) {
+			return entity;
+		}
+	}
+	return 0;
+}
 
 static Rng2F32 camera_get_bounds() {
 	GameState* gs = game_state();
@@ -268,7 +297,7 @@ static void th_entity_set_bounds_from_sprite(Entity* entity) {
 
 static Entity* th_entity_create_plant() {
 	WorldState* world = world_state();
-	Entity* entity = TH_ARRAY_PUSH(world->entities, world->entity_count);
+	Entity* entity = EntityCreate();
 	entity->sprite = th_texture_sprite_get("plant0"); // first default
 	th_entity_set_bounds_from_sprite(entity);
 	entity->render = 1;
@@ -280,7 +309,7 @@ static Entity* th_entity_create_plant() {
 static void th_world_init(WorldState* world) {
 	{
 		// player
-		Entity* entity = TH_ARRAY_PUSH(world->entities, world->entity_count);
+		Entity* entity = EntityCreate();
 		world->player = entity;
 		entity->sprite = th_texture_sprite_get("arcane_player");
 		th_entity_set_bounds_from_sprite(entity);
@@ -290,21 +319,24 @@ static void th_world_init(WorldState* world) {
 		entity->col = TH_WHITE;
 	}
 	{
-		// held seed
-		Entity* entity = TH_ARRAY_PUSH(world->entities, world->entity_count);
+		// starter seed
+		Entity* entity = EntityCreate();
 		entity->bounds.max = Vec2(2.0f, 2.0f);
 		entity->bounds = range2_center_bottom(entity->bounds);
 		entity->render = 1;
+		entity->interactable = 1;
+		entity->seed = 1;
 		//entity->rigid_body = 1;
 		entity->render_rect = entity->bounds;
 		entity->col = TH_WHITE;
-		world->held_seed = entity;
+		// world->held_seed = entity;
 	}
 	{
 		// test resource
-		Entity* entity = TH_ARRAY_PUSH(world->entities, world->entity_count);
+		Entity* entity = EntityCreate();
 		entity->sprite = th_texture_sprite_get("resource1");
 		th_entity_set_bounds_from_sprite(entity);
+		entity->pos.x = 100.0f;
 		entity->render = 1;
 		entity->interactable = 1;
 		entity->col = TH_WHITE;
@@ -318,7 +350,7 @@ static void sgp_draw_debug_rect_lines(Rng2F32 rect) {
 	sgp_draw_line(rect.max.x, rect.max.y, rect.max.x, rect.min.y);
 }
 
-static Rng2F32 th_entity_bounds_in_world(const Entity* entity) {
+static Rng2F32 EntityBoundsInWorld(const Entity* entity) {
 	Rng2F32 result = entity->bounds;
 	result = Shift2F32(result, entity->pos);
 	return result;

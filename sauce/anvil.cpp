@@ -29,8 +29,7 @@ static void frame(void) {
 		th_world_init(world);
 	}
 
-	for (int i = 0; i < world->entity_count; i++) {
-		Entity* entity = &world->entities[i];
+	ForEach(entity, world->entities, Entity*) {
 		MemoryZeroStruct(&entity->frame);
 	}
 
@@ -80,8 +79,7 @@ static void frame(void) {
 	}
 
 	// Entity Physics
-	for (int i = 0; i < world->entity_count; i++) {
-		Entity* entity = &world->entities[i];
+	ForEach(entity, world->entities, Entity*) {
 		if (!entity->rigid_body)
 			continue;
 
@@ -145,43 +143,51 @@ static void frame(void) {
 		sgp_draw_debug_rect_lines(interact_rect);
 
 		// does interact_rect overlap with any interactable entities?
-		//ForEach(Entity* entity, world->entities)
-		for (Entity* entity = world->entities; (entity - world->entities) < ArrayCount(world->entities); entity += 1)
+		Entity* selected_entity = 0;
+		ForEach(entity, world->entities, Entity*)
 		{
-			if (!entity->interactable)
+			if (!entity->interactable || entity->id == world->held_entity_id)
 				continue;
 
-			Rng2F32 en_bounds = th_entity_bounds_in_world(entity);
+			if (Overlap2F32(EntityBoundsInWorld(entity), interact_rect)) {
+				selected_entity = entity;
+			}
+		}
 
-			Vec2 min_diff = en_bounds.min - interact_rect.min;
-			LOG("min: %f, %f", min_diff.x, min_diff.y);
+		if (selected_entity) {
+			selected_entity->frame.render_highlight = 1; // can pick up feedback
 
-			//LOG("max: %f, %f", diff.max.x, diff.max.y);
-
-			/*if (range2_overlaps(en_bounds, interact_rect)) {
-				entity->frame.render_highlight = 1;
-			}*/
+			if (gs->key_pressed[SAPP_KEYCODE_E]) {
+				world->held_entity_id = selected_entity->id;
+			}
 		}
 	}
 
-	// SEED
-	if (world->held_seed) {
-		Entity* seed = world->held_seed;
-		seed->pos.x = roundf(world_mouse.x);
-		seed->pos.y = 0.0f;
+	// ENTITY HOLDING
+	{
+		Entity* entity = EntityFromID(world->held_entity_id);
+		if (entity) {
+			if (entity->seed) { // SEED PLACEMENT
+				entity->pos.x = roundf(world_mouse.x);
+				entity->pos.y = 0.0f;
 
-		sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
-		sgp_draw_line(seed->pos.x, world_mouse.y, seed->pos.x, 0.0f);
+				sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
+				sgp_draw_line(entity->pos.x, world_mouse.y, entity->pos.x, 0.0f);
 
-		if (gs->mouse_pressed[SAPP_MOUSEBUTTON_LEFT]) {
-			Entity* plant = th_entity_create_plant();
-			plant->pos = seed->pos;
+				if (gs->mouse_pressed[SAPP_MOUSEBUTTON_LEFT]) {
+					Entity* plant = th_entity_create_plant();
+					plant->pos = entity->pos;
+					EntityDestroy(entity);
+				}
+			}
+			else {
+				// todo - snap to player hands
+			}
 		}
 	}
 
 	// PLANT UPDATE
-	for (int i = 0; i < world->entity_count; i++) {
-		Entity* entity = &world->entities[i];
+	ForEach(entity, world->entities, Entity*) {
 		if (!entity->plant)
 			continue;
 
@@ -224,14 +230,10 @@ static void frame(void) {
 	}
 
 	sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
-	sgp_draw_line(-200.f, 0.0f, 200.0f, 0.0f);
-
-	// bind dump texture to slot 0
-	
+	sgp_draw_line(-200.f, 0.0f, 200.0f, 0.0f); // ground line
 
 	// Entity Render
-	for (int i = 0; i < world->entity_count; i++) {
-		Entity* entity = &world->entities[i];
+	ForEach(entity, world->entities, Entity*) {
 		if (!entity->render)
 			continue;
 
@@ -268,8 +270,6 @@ static void frame(void) {
 		sgp_draw_debug_rect_lines(rect);
 	}
 	#endif
-
-	// fragment shader image count doesn't match sg_shader_desc
 
 	sg_pass_action pass_action = { 0 };
 	sg_begin_default_pass(&pass_action, window_size.x, window_size.y);

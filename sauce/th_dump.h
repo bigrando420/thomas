@@ -7,7 +7,7 @@
 // @string - if you overrun this with a long string, you will die.
 #define LOG(_str, ...) {char output[256] = { 0 }; sprintf(output, _str"\n", __VA_ARGS__); PRINT_STRING(output);}
 
-//#define ForEach(element, array) for ()
+#define ForEach(name, array, type) for (type name = array; (name - array) < ArrayCount(array); name += 1)
 #define TH_ARRAY_PUSH(flat_array, count) &flat_array[count++]; Assert((count) + 1 < ArrayCount(flat_array))
 
 #define SIGN(x) (((x) > 0) - ((x) < 0))
