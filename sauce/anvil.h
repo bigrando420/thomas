@@ -22,23 +22,19 @@ typedef struct Particle Particle;
 typedef void (*ParticleEmitterFunc)(Particle*, Emitter*);
 #define PARTICLE_EMITTER_FUNC(function_name) static void function_name(Particle* particle, Emitter* emitter)
 
-struct Emitter
-{
+struct Emitter {
 	vec2 pos;
 	float frequency;
-	// frequency is amount of particles to be spawned each frame. The decimal is the % chance of it rounding up: 0.2 == 20% chance to spawn each frame
 	ParticleEmitterFunc emit_func;
 };
 
-struct Particle
-{
+struct Particle {
 	vec2 pos;
 	vec2 vel;
 	vec4 col;
 	float start_life;
 	float life;
 	float size_mult;
-
 	// flags;
 	bool8 fade_in;
 	bool8 fade_out;
@@ -63,17 +59,18 @@ struct RenderRect {
 
 // An ECS made simple. The Megastruct.
 struct Entity {
+	bool rigid_body;
 	vec2 pos;
 	vec2 vel;
 	vec2 acc;
 	range2 bounds;
-	RenderRect render_rects[8];
-	uint32 render_rect_count;
-	bool8 flip_horizontal;
-	float plant_stage;
-	bool rigid_body;
 	bool render;
+	range2 render_rect;
+	Sprite* sprite;
+	vec4 col;
+	bool8 flip_horizontal;
 	bool plant;
+	float plant_stage;
 };
 
 struct Camera {
@@ -194,7 +191,7 @@ static uint32 hash_from_string(const char* string) {
 	return result;
 }
 
-static Atlas* th_image_from_string(const char* string) {
+static Atlas* th_texture_atlas_get(const char* string) {
 	GameState* gs = game_state();
 	for (int i = 0; i < gs->atlas_count; i++) {
 		Atlas* texture = &gs->atlases[i];
@@ -212,7 +209,7 @@ static Atlas* th_texture_atlas_load(const char* name) {
 	stbi_set_flip_vertically_on_load(1);
 	uint8* data = stbi_load(name, &x, &y, &comp, 0);
 	Assert(data);
-	sg_range range = { data, x * y * 4 * sizeof(char) };
+	sg_range range = { data, x * y * 4 * sizeof(uint8) };
 	sg_image_desc desc = { 0 };
 	desc.width = x;
 	desc.height = y;
@@ -255,15 +252,23 @@ static Sprite* th_texture_sprite_get(const char* name) {
 	return 0;
 }
 
+// ENTITY HELPERS
+
+static void th_entity_set_bounds_from_sprite(Entity* entity) {
+	Assert(entity->sprite);
+	entity->bounds = range2_remove_offset(entity->sprite->sub_rect);
+	entity->bounds = range2_center_bottom(entity->bounds);
+	entity->render_rect = entity->bounds;
+}
+
 static Entity* th_entity_create_plant() {
 	WorldState* world = world_state();
 	Entity* entity = TH_ARRAY_PUSH(world->entities, world->entity_count);
+	entity->sprite = th_texture_sprite_get("plant0"); // first default
+	th_entity_set_bounds_from_sprite(entity);
 	entity->render = 1;
 	entity->plant = 1;
-	RenderRect* render = TH_ARRAY_PUSH(entity->render_rects, entity->render_rect_count);
-	render->rect.max = vec2(16.0f, 64.0f);
-	render->rect = range2_center_bottom(render->rect);
-	render->col = TH_WHITE;
+	entity->col = TH_WHITE;
 	return entity;
 }
 
@@ -272,18 +277,12 @@ static void th_world_init(WorldState* world) {
 		// player
 		Entity* entity = TH_ARRAY_PUSH(world->entities, world->entity_count);
 		world->player = entity;
-		entity->bounds.max = vec2(5.0f, 10.0f);
-		entity->bounds = range2_center_bottom(entity->bounds);
+		entity->sprite = th_texture_sprite_get("arcane_player");
+		th_entity_set_bounds_from_sprite(entity);
 		entity->pos.y = 100.0f;
 		entity->rigid_body = 1;
 		entity->render = 1;
-		RenderRect* render = TH_ARRAY_PUSH(entity->render_rects, entity->render_rect_count);
-		render->rect = entity->bounds;
-		render->col = TH_WHITE;
-		RenderRect* eye = TH_ARRAY_PUSH(entity->render_rects, entity->render_rect_count);
-		eye->col = TH_BLACK;
-		eye->rect.max = vec2(1, 1);
-		eye->rect = range2_shift(eye->rect, vec2(1.0f, 8.0f));
+		entity->col = TH_WHITE;
 	}
 	{
 		// test seed
@@ -292,20 +291,16 @@ static void th_world_init(WorldState* world) {
 		entity->bounds = range2_center_bottom(entity->bounds);
 		entity->render = 1;
 		//entity->rigid_body = 1;
-		RenderRect* render = TH_ARRAY_PUSH(entity->render_rects, entity->render_rect_count);
-		render->rect = entity->bounds;
-		render->col = TH_WHITE;
+		entity->render_rect = entity->bounds;
+		entity->col = TH_WHITE;
 		world->held_seed = entity;
 	}
 	{
 		Entity* entity = TH_ARRAY_PUSH(world->entities, world->entity_count);
-		entity->bounds.max = vec2(4.0f, 4.0f);
-		entity->bounds = range2_center_bottom(entity->bounds);
+		entity->sprite = th_texture_sprite_get("resource1");
+		th_entity_set_bounds_from_sprite(entity);
 		entity->render = 1;
-		RenderRect* render = TH_ARRAY_PUSH(entity->render_rects, entity->render_rect_count);
-		render->rect = entity->bounds;
-		render->col = TH_WHITE;
-		render->sprite = th_texture_sprite_get("resource1");
+		entity->col = TH_WHITE;
 	}
 }
 

@@ -314,4 +314,11 @@ static range2 range2_scale(const range2& range, const float& scale) {
 	return result;
 }
 
+static range2 range2_remove_offset(range2 range) {
+	range2 result = {0};
+	vec2 size = range2_size(range);
+	result.max = size;
+	return result;
+}
+
 #endif
