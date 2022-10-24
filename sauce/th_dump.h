@@ -98,6 +98,7 @@ struct vec4_uint8
 
 struct vec2_float
 {
+	vec2_float(float _x = 0.0f, float _y = 0.0f) : x(_x), y(_y) {};
 	float x;
 	float y;
 };
@@ -111,6 +112,8 @@ struct vec3_float
 
 struct vec4_float
 {
+	vec4_float(float _x = 0.0f, float _y = 0.0f, float _z = 0.0f, float _w = 0.0f) :
+		x(_x), y(_y), z(_z), w(_w) {};
 	union {
 		float x;
 		float r;
@@ -137,6 +140,8 @@ struct range1_float
 
 struct range2_float
 {
+	range2_float(vec2 _min, vec2 _max) : min(_min), max(_max) {};
+	range2_float(float val = 0.0f) : min(vec2(val, val)), max(vec2(val, val)) {};
 	vec2_float min;
 	vec2_float max;
 };
