@@ -1,3 +1,10 @@
 .vs/
 anvil/anvil.vcxproj.user
 build/
+
+sauce/third_party/telescope/*
+!sauce/third_party/telescope/base
+sauce/third_party/telescope/base/*
+!sauce/third_party/telescope/base/base_ctx_crack.h
+!sauce/third_party/telescope/base/base_types.h
+!sauce/third_party/telescope/base/base_math.h

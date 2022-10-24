@@ -1,42 +1,52 @@
-#include "thomas.h"
-
-#define SOKOL_LOG(msg) PRINT_STRING(msg)
+#define SOKOL_LOG(msg) OutputDebugString(msg)
 #define SOKOL_D3D11
 #define SOKOL_IMPL
-#include "ext/sokol_gfx.h"
-#include "ext/sokol_gp.h"
-#include "ext/sokol_app.h"
-#include "ext/sokol_glue.h"
+#include "third_party/sokol_gfx.h"
+#include "third_party/sokol_gp.h"
+#include "third_party/sokol_app.h"
+#include "third_party/sokol_glue.h"
 
 #define HANDMADE_MATH_IMPLEMENTATION
-#include "ext/HandmadeMath.h"
+#include "third_party/HandmadeMath.h"
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "ext/stb_image.h"
+#include "third_party/stb_image.h"
 
+#include "thomas.h"
 #include "anvil.h"
+
+/*
+
+- [ ] write a mini portable memory arena using malloc
+
+*/
 
 static void frame(void) {
 	GameState* gs = game_state();
 	WorldState* world = world_state();
 	if (gs->key_pressed[SAPP_KEYCODE_B]) {
-		MEMORY_ZERO_STRUCT(world);
+		MemoryZeroStruct(world);
 		th_world_init(world);
 	}
 
+	for (int i = 0; i < world->entity_count; i++) {
+		Entity* entity = &world->entities[i];
+		MemoryZeroStruct(&entity->frame);
+	}
+
 	Entity*& player = world->player;
-	const vec2 window_size = { (float)sapp_width(), (float)sapp_height() };
+	const Vec2 window_size = { (F32)sapp_width(), (F32)sapp_height() };
 	gs->window_size = window_size;
-	float ratio = window_size.x / (float)window_size.y;
-	float delta_t = sapp_frame_duration();
-	const vec2 world_mouse = mouse_pos_in_worldspace();
+	F32 ratio = window_size.x / (F32)window_size.y;
+	F32 delta_t = sapp_frame_duration();
+	const Vec2 world_mouse = mouse_pos_in_worldspace();
 
 	// PLAYER INPUT
 	if (world->player) {
 		if (gs->key_pressed[SAPP_KEYCODE_SPACE]) {
 			player->vel.y = 300.0f;
 		}
-		vec2 axis_input = { 0 };
+		Vec2 axis_input = { 0 };
 		if (gs->key_down[SAPP_KEYCODE_A]) {
 			axis_input.x -= 1.0f;
 			world->player->flip_horizontal = 1;
@@ -52,12 +62,12 @@ static void frame(void) {
 	for (int i = 0; i < gs->emitter_count; i++) {
 		Emitter* emitter = &gs->emitters[i];
 		
-		float freq_remainder = emitter->frequency - floorf(emitter->frequency);
-		bool8 remainder = 0;
-		if (((float)rand() / (float)RAND_MAX) < freq_remainder)
+		F32 freq_remainder = emitter->frequency - floorf(emitter->frequency);
+		B8 remainder = 0;
+		if (((F32)rand() / (F32)RAND_MAX) < freq_remainder)
 			remainder = 1;
 
-		uint32 emit_amount = floorf(emitter->frequency) + remainder;
+		U32 emit_amount = floorf(emitter->frequency) + remainder;
 		for (int j = 0; j < emit_amount; j++) {
 			gs->particle_count++;
 			if (gs->particle_count == ArrayCount(gs->particles))
@@ -79,11 +89,11 @@ static void frame(void) {
 		entity->acc.x += -15.0f * entity->vel.x;
 
 		// gravity
-		bool8 falling = entity->vel.y < 0.f;
+		B8 falling = entity->vel.y < 0.f;
 		entity->acc.y -= (falling ? 2.f : 1.f) * GRAVITY;
 
 		// integrate acceleration and velocity into position
-		vec2 next_pos = 0.5f * entity->acc * SQUARE(delta_t) + entity->vel * delta_t + entity->pos;
+		Vec2 next_pos = 0.5f * entity->acc * SQUARE(delta_t) + entity->vel * delta_t + entity->pos;
 
 		// integrate acceleration into velocity
 		entity->vel += entity->acc * delta_t;
@@ -98,12 +108,6 @@ static void frame(void) {
 		entity->pos = next_pos;
 	}
 
-	// update camera
-	if (world->player) {
-		gs->cam.pos.x = player->pos.x;
-		gs->cam.pos.y = 20.0f;
-	}
-
 	// BEGIN RENDER
 	sgp_begin(window_size.x, window_size.y);
 	sgp_viewport(0, 0, window_size.x, window_size.y);
@@ -113,12 +117,12 @@ static void frame(void) {
 	sgp_scale(gs->cam.scale, gs->cam.scale);
 	sgp_translate(-gs->cam.pos.x, -gs->cam.pos.y);
 	#else
-	range2 view_rect = { 0 };
-	view_rect.max = vec2(window_size.x, window_size.y);
+	Rng2F32 view_rect = { 0 };
+	view_rect.max = Vec2(window_size.x, window_size.y);
 	view_rect = range2_center_middle(view_rect);
-	view_rect = range2_shift(view_rect, vec2(0, 100.f));
+	view_rect = Shift2F32(view_rect, Vec2(0, 100.f));
 	view_rect = range2_scale(view_rect, gs->cam.scale);
-	view_rect = range2_shift(view_rect, gs->cam.pos);
+	view_rect = Shift2F32(view_rect, gs->cam.pos);
 	sgp_project(view_rect.min.x, view_rect.max.x, view_rect.max.y, view_rect.min.y);
 	#endif
 
@@ -126,6 +130,39 @@ static void frame(void) {
 	sgp_set_blend_mode(SGP_BLENDMODE_BLEND);
 	sgp_set_color(0.1f, 0.1f, 0.1f, 1.0f);
 	sgp_clear();
+
+	if (world->player) {
+		// camera update
+		gs->cam.pos.x = player->pos.x;
+		gs->cam.pos.y = 20.0f;
+
+		// player interact
+		Rng2F32 interact_rect = { 0 };
+		interact_rect.max = Vec2(20, 20);
+		interact_rect = range2_center_left(interact_rect);
+		interact_rect = Shift2F32(interact_rect, player->pos);
+		sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
+		sgp_draw_debug_rect_lines(interact_rect);
+
+		// does interact_rect overlap with any interactable entities?
+		//ForEach(Entity* entity, world->entities)
+		for (Entity* entity = world->entities; (entity - world->entities) < ArrayCount(world->entities); entity += 1)
+		{
+			if (!entity->interactable)
+				continue;
+
+			Rng2F32 en_bounds = th_entity_bounds_in_world(entity);
+
+			Vec2 min_diff = en_bounds.min - interact_rect.min;
+			LOG("min: %f, %f", min_diff.x, min_diff.y);
+
+			//LOG("max: %f, %f", diff.max.x, diff.max.y);
+
+			/*if (range2_overlaps(en_bounds, interact_rect)) {
+				entity->frame.render_highlight = 1;
+			}*/
+		}
+	}
 
 	// SEED
 	if (world->held_seed) {
@@ -153,8 +190,8 @@ static void frame(void) {
 			entity->plant_stage = 8.0f;
 		}
 
-		uint8 stage = floorf(entity->plant_stage);
-		stage = CLAMP_UPPER(stage, 6);
+		U8 stage = floorf(entity->plant_stage);
+		stage = ClampTop(stage, 6);
 		Sprite* plant = th_texture_sprite_get("plant0");
 		plant += stage;
 		entity->sprite = plant;
@@ -169,17 +206,17 @@ static void frame(void) {
 		Assert(particle->life > 0.f);
 		particle->life -= delta_t;
 		if (particle->life <= 0.f) {
-			MEMORY_ZERO_STRUCT(particle);
+			MemoryZeroStruct(particle);
 			continue;
 		}
 
 		particle->pos += particle->vel * delta_t;
 
-		float alpha = float_alpha(particle->life, particle->start_life, 0.f);
+		F32 alpha = float_alpha(particle->life, particle->start_life, 0.f);
 		alpha = float_alpha_sin_mid(alpha);
 
-		DEFER_LOOP(sgp_push_transform(), sgp_pop_transform()) {
-			vec2 render_size = vec2(1, 1) * particle->size_mult;
+		DeferLoop(sgp_push_transform(), sgp_pop_transform()) {
+			Vec2 render_size = Vec2(1, 1) * particle->size_mult;
 			sgp_set_color(particle->col.r, particle->col.g, particle->col.b, particle->col.a * alpha);
 			sgp_translate(particle->pos.x, particle->pos.y);
 			sgp_draw_filled_rect(render_size.x * -0.5f, render_size.y * -0.5f, render_size.x, render_size.y);
@@ -198,8 +235,10 @@ static void frame(void) {
 		if (!entity->render)
 			continue;
 
-		range2 rect = range2_shift(entity->render_rect, entity->pos);
+		Rng2F32 rect = Shift2F32(entity->render_rect, entity->pos);
 		sgp_set_color(V4_EXPAND(entity->col));
+		if (entity->frame.render_highlight)
+			sgp_set_color(0.5f, 0.5f, 0.5f, 0.5f);
 		if (entity->sprite) {
 			Assert(entity->sprite->atlas); // invalid atlas
 			sgp_rect target_rect = range2_to_sgp_rect(rect);
@@ -223,13 +262,10 @@ static void frame(void) {
 		Entity* entity = &world->entities[i];
 		if (!entity->rigid_body)
 			continue;
-		range2 rect = entity->bounds;
-		rect = range2_shift(rect, entity->pos);
+		Rng2F32 rect = entity->bounds;
+		rect = Shift2F32(rect, entity->pos);
 		sgp_set_color(RENDER_COLLIDER_COLOR);
-		sgp_draw_line(rect.min.x, rect.min.y, rect.min.x, rect.max.y);
-		sgp_draw_line(rect.min.x, rect.min.y, rect.max.x, rect.min.y);
-		sgp_draw_line(rect.max.x, rect.max.y, rect.min.x, rect.max.y);
-		sgp_draw_line(rect.max.x, rect.max.y, rect.max.x, rect.min.y);
+		sgp_draw_debug_rect_lines(rect);
 	}
 	#endif
 
@@ -270,32 +306,32 @@ static void init(void) {
 
 	printf("balls");
 
-	Atlas* atlas = th_texture_atlas_load("dump.png");
+	TextureAtlas* atlas = th_texture_atlas_load("dump.png");
 	// plant stages
-	range2 sub_rect = range2(vec2(), vec2(16, 64));
+	Rng2F32 sub_rect = Rng2F32(Vec2(), Vec2(16, 64));
 	th_texture_sprite_create(atlas, "plant0", sub_rect);
-	sub_rect = range2_shift(sub_rect, vec2(16, 0));
+	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
 	th_texture_sprite_create(atlas, "plant1", sub_rect);
-	sub_rect = range2_shift(sub_rect, vec2(16, 0));
+	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
 	th_texture_sprite_create(atlas, "plant2", sub_rect);
-	sub_rect = range2_shift(sub_rect, vec2(16, 0));
+	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
 	th_texture_sprite_create(atlas, "plant3", sub_rect);
-	sub_rect = range2_shift(sub_rect, vec2(16, 0));
+	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
 	th_texture_sprite_create(atlas, "plant4", sub_rect);
-	sub_rect = range2_shift(sub_rect, vec2(16, 0));
+	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
 	th_texture_sprite_create(atlas, "plant5", sub_rect);
-	sub_rect = range2_shift(sub_rect, vec2(16, 0));
+	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
 	th_texture_sprite_create(atlas, "plant6", sub_rect);
-	sub_rect = range2_shift(sub_rect, vec2(16, 0));
+	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
 	th_texture_sprite_create(atlas, "plant7", sub_rect);
 	// resources
-	sub_rect = range2_shift(sub_rect, vec2(16, 0));
+	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
 	sub_rect.max = sub_rect.min;
-	sub_rect.max += vec2(4, 4);
+	sub_rect.max += Vec2(4, 4);
 	th_texture_sprite_create(atlas, "resource1", sub_rect);
 	// player
-	sub_rect.min = vec2(144, 0);
-	sub_rect.max = sub_rect.min + vec2(16, 32);
+	sub_rect.min = Vec2(144, 0);
+	sub_rect.max = sub_rect.min + Vec2(16, 32);
 	th_texture_sprite_create(atlas, "arcane_player", sub_rect);
 
 	{
@@ -319,35 +355,35 @@ static void event(const sapp_event* ev) {
 	GameState* gs = game_state();
 	switch (ev->type) {
 	case SAPP_EVENTTYPE_KEY_UP: {
-		bool8 already_up = !gs->key_down[ev->key_code];
+		B8 already_up = !gs->key_down[ev->key_code];
 		if (!already_up)
 			gs->key_released[ev->key_code] = 1;
 		gs->key_down[ev->key_code] = 0;
 	} break;
 	case SAPP_EVENTTYPE_KEY_DOWN: {
-		bool8 already_down = gs->key_down[ev->key_code];
+		B8 already_down = gs->key_down[ev->key_code];
 		if (!already_down)
 			gs->key_pressed[ev->key_code] = 1;
 		gs->key_down[ev->key_code] = 1;
 	} break;
 	case SAPP_EVENTTYPE_MOUSE_UP: {
-		bool8 already_up = !gs->mouse_down[ev->mouse_button];
+		B8 already_up = !gs->mouse_down[ev->mouse_button];
 		if (!already_up)
 			gs->mouse_released[ev->mouse_button] = 1;
 		gs->mouse_down[ev->mouse_button] = 0;
 	} break;
 	case SAPP_EVENTTYPE_MOUSE_DOWN: {
-		bool8 already_down = gs->mouse_down[ev->mouse_button];
+		B8 already_down = gs->mouse_down[ev->mouse_button];
 		if (!already_down)
 			gs->mouse_pressed[ev->mouse_button] = 1;
 		gs->mouse_down[ev->mouse_button] = 1;
 	} break;
 	case SAPP_EVENTTYPE_MOUSE_SCROLL: {
 		gs->cam.scale += ev->scroll_y / 8.0f;
-		gs->cam.scale = CLAMP(1.0f, gs->cam.scale, 10.0f);
+		gs->cam.scale = Clamp(1.0f, gs->cam.scale, 10.0f);
 	} break;
 	case SAPP_EVENTTYPE_MOUSE_MOVE: {
-		gs->mouse_pos = vec2(ev->mouse_x, ev->mouse_y);
+		gs->mouse_pos = Vec2(ev->mouse_x, ev->mouse_y);
 	};
 	}
 

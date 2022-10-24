@@ -35,7 +35,7 @@
     <OutDir>$(ProjectDir)build</OutDir>
     <IntDir>$(ProjectDir)build</IntDir>
     <IncludePath>$(ProjectDir)sauce;$(VC_IncludePath);C:\Program Files (x86)\Windows Kits\10\Include\10.0.19041.0\ucrt;C:\Program Files (x86)\Windows Kits\10\Include\10.0.19041.0\cppwinrt\winrt;C:\Program Files (x86)\Windows Kits\10\Include\10.0.19041.0\shared;C:\Program Files (x86)\Windows Kits\10\Include\10.0.19041.0\um;C:\Program Files (x86)\Windows Kits\10\Include\10.0.19041.0\winrt</IncludePath>
-    <SourcePath>$(ProjectDir)sauce\ext;$(ProjectDir)sauce;$(VC_SourcePath);$(IncludePath)</SourcePath>
+    <SourcePath>$(ProjectDir)sauce\third_party;$(ProjectDir)sauce;$(VC_SourcePath);$(IncludePath)</SourcePath>
     <LibraryPath>C:\Program Files (x86)\Windows Kits\10\Lib\10.0.19041.0\ucrt\x64;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.19041.0\um\x64;$(LibraryPath)</LibraryPath>
     <NMakeIncludeSearchPath>$(ProjectDir)sauce;$(ProjectDir)sauce\ext</NMakeIncludeSearchPath>
   </PropertyGroup>
@@ -46,10 +46,23 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <None Include="build.bat" />
+    <None Include="build_ts.bat" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="sauce\anvil.h" />
-    <ClInclude Include="sauce\th_array.h" />
+    <ClInclude Include="sauce\ext\telescope\base\base_atlas.h" />
+    <ClInclude Include="sauce\ext\telescope\base\base_ctx_crack.h" />
+    <ClInclude Include="sauce\ext\telescope\base\base_inc.h" />
+    <ClInclude Include="sauce\ext\telescope\base\base_math.h" />
+    <ClInclude Include="sauce\ext\telescope\base\base_memory.h" />
+    <ClInclude Include="sauce\ext\telescope\base\base_ring.h" />
+    <ClInclude Include="sauce\ext\telescope\base\base_strings.h" />
+    <ClInclude Include="sauce\ext\telescope\base\base_tctx.h" />
+    <ClInclude Include="sauce\ext\telescope\base\base_types.h" />
+    <ClInclude Include="sauce\ext\telescope\base\md_helpers.h" />
+    <ClInclude Include="sauce\third_party\sokol_app.h" />
+    <ClInclude Include="sauce\third_party\sokol_gfx.h" />
+    <ClInclude Include="sauce\third_party\sokol_gp.h" />
     <ClInclude Include="sauce\th_dump.h" />
     <ClInclude Include="sauce\ext\cute_c2.h" />
     <ClInclude Include="sauce\ext\fmod\fmod.h" />
@@ -71,10 +84,21 @@
     <ClInclude Include="sauce\ext\stb_image.h" />
     <ClInclude Include="sauce\thomas.h" />
     <ClInclude Include="sauce\th_memory.h" />
+    <ClInclude Include="sauce\th_telescope.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="sauce\anvil.cpp" />
-    <ClCompile Include="sauce\thomas_internal.cpp" />
+    <ClCompile Include="sauce\ext\telescope\base\base_atlas.c" />
+    <ClCompile Include="sauce\ext\telescope\base\base_inc.c" />
+    <ClCompile Include="sauce\ext\telescope\base\base_math.c" />
+    <ClCompile Include="sauce\ext\telescope\base\base_memory.c" />
+    <ClCompile Include="sauce\ext\telescope\base\base_ring.c" />
+    <ClCompile Include="sauce\ext\telescope\base\base_strings.c" />
+    <ClCompile Include="sauce\ext\telescope\base\base_tctx.c" />
+    <ClCompile Include="sauce\ext\telescope\base\base_types.c" />
+    <ClCompile Include="sauce\ext\telescope\base\md_helpers.c" />
+    <ClCompile Include="sauce\third_party\telescope_light.c" />
+    <ClCompile Include="sauce\third_party\telescope_light.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
