@@ -1,9 +1,12 @@
 #ifdef _WIN32
+#define SOKOL_LOG(msg) PRINT_STRING(msg)
 #define SOKOL_D3D11
 #elif __linux__
 #define SOKOL_GLCORE33
 #endif
 #define SOKOL_IMPL
+
+#include "thomas.h"
 #include "ext/sokol_gfx.h"
 #include "ext/sokol_gp.h"
 #include "ext/sokol_app.h"
@@ -15,11 +18,6 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "ext/stb_image.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-
-#include "thomas.h"
 #include "anvil.h"
 
 static void frame(void) {
@@ -163,7 +161,7 @@ static void frame(void) {
 		stage = CLAMP_UPPER(stage, 6);
 		Sprite* plant = th_texture_sprite_get("plant0");
 		plant += stage;
-		entity->render_rects[0].sprite = plant;
+		entity->sprite = plant;
 	}
 
 	// Particle Render
@@ -195,37 +193,32 @@ static void frame(void) {
 	sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
 	sgp_draw_line(-200.f, 0.0f, 200.0f, 0.0f);
 
+	// bind dump texture to slot 0
+	
+
 	// Entity Render
 	for (int i = 0; i < world->entity_count; i++) {
 		Entity* entity = &world->entities[i];
 		if (!entity->render)
 			continue;
 
-		for (int j = 0; j < entity->render_rect_count; j++) {
-			RenderRect* render = &entity->render_rects[j];
-			
-			range2 rect = render->rect;
+		range2 rect = range2_shift(entity->render_rect, entity->pos);
+		sgp_set_color(V4_EXPAND(entity->col));
+		if (entity->sprite) {
+			Assert(entity->sprite->atlas); // invalid atlas
+			sgp_rect target_rect = range2_to_sgp_rect(rect);
+			sgp_rect src_rect = range2_to_sgp_rect(entity->sprite->sub_rect);
 			if (entity->flip_horizontal) {
-				rect.min.x *= -1.0f;
-				rect.max.x *= -1.0f;
-				float temp = rect.min.x;
-				rect.min.x = rect.max.x;
-				rect.max.x = temp;
+				target_rect.x += target_rect.w;
+				target_rect.w *= -1;
 			}
-			rect = range2_shift(rect, entity->pos);
-
-			// draw rect
-			sgp_set_color(V4_EXPAND(render->col));
-			if (render->sprite) {
-				Assert(render->sprite->atlas); // invalid atlas
-				sgp_set_image(0, render->sprite->atlas->image);
-				sgp_draw_textured_rect_ex(0, range2_to_sgp_rect(rect), range2_to_sgp_rect(render->sprite->sub_rect));
-				sgp_unset_image(0);
-			} else {
-				// this is the price you pay for using other people's libraries (a worthwhile trade off in this case (for now))
-				sgp_rect icky_rect = range2_to_sgp_rect(rect);
-				sgp_draw_filled_rect(icky_rect.x, icky_rect.y, icky_rect.w, icky_rect.h);
-			}
+			sgp_set_image(0, entity->sprite->atlas->image);
+			sgp_draw_textured_rect_ex(0, target_rect, src_rect);
+			sgp_unset_image(0);
+			sgp_reset_image(0);
+		} else {
+			sgp_rect icky_rect = range2_to_sgp_rect(rect);
+			sgp_draw_filled_rect(icky_rect.x, icky_rect.y, icky_rect.w, icky_rect.h);
 		}
 	}
 
@@ -243,6 +236,8 @@ static void frame(void) {
 		sgp_draw_line(rect.max.x, rect.max.y, rect.max.x, rect.min.y);
 	}
 	#endif
+
+	// fragment shader image count doesn't match sg_shader_desc
 
 	sg_pass_action pass_action = { 0 };
 	sg_begin_default_pass(&pass_action, window_size.x, window_size.y);
@@ -276,6 +271,7 @@ static void init(void) {
 	// ENTRY
 	GameState* gs = game_state();
 	WorldState* world = world_state();
+<<<<<<< HEAD
 	Atlas* plants = th_texture_atlas_load("plant.png");
 	range2 plant_sub_rect = range2(vec2(), vec2(16, 64));
 	th_texture_sprite_create(plants, "plant0", plant_sub_rect);
@@ -298,6 +294,39 @@ static void init(void) {
 	plant_sub_rect.max = plant_sub_rect.min;
 	plant_sub_rect.max += vec2(4, 4);
 	th_texture_sprite_create(plants, "resource1", plant_sub_rect);
+=======
+
+	printf("balls");
+
+	Atlas* atlas = th_texture_atlas_load("dump.png");
+	// plant stages
+	range2 sub_rect = range2(vec2(), vec2(16, 64));
+	th_texture_sprite_create(atlas, "plant0", sub_rect);
+	sub_rect = range2_shift(sub_rect, vec2(16, 0));
+	th_texture_sprite_create(atlas, "plant1", sub_rect);
+	sub_rect = range2_shift(sub_rect, vec2(16, 0));
+	th_texture_sprite_create(atlas, "plant2", sub_rect);
+	sub_rect = range2_shift(sub_rect, vec2(16, 0));
+	th_texture_sprite_create(atlas, "plant3", sub_rect);
+	sub_rect = range2_shift(sub_rect, vec2(16, 0));
+	th_texture_sprite_create(atlas, "plant4", sub_rect);
+	sub_rect = range2_shift(sub_rect, vec2(16, 0));
+	th_texture_sprite_create(atlas, "plant5", sub_rect);
+	sub_rect = range2_shift(sub_rect, vec2(16, 0));
+	th_texture_sprite_create(atlas, "plant6", sub_rect);
+	sub_rect = range2_shift(sub_rect, vec2(16, 0));
+	th_texture_sprite_create(atlas, "plant7", sub_rect);
+	// resources
+	sub_rect = range2_shift(sub_rect, vec2(16, 0));
+	sub_rect.max = sub_rect.min;
+	sub_rect.max += vec2(4, 4);
+	th_texture_sprite_create(atlas, "resource1", sub_rect);
+	// player
+	sub_rect.min = vec2(144, 0);
+	sub_rect.max = sub_rect.min + vec2(16, 32);
+	th_texture_sprite_create(atlas, "arcane_player", sub_rect);
+
+>>>>>>> c43a0e5f172afff0f05306e0482197900fb02e48
 	{
 		// background emitter
 		Emitter* emitter = TH_ARRAY_PUSH(gs->emitters, gs->emitter_count);
@@ -368,6 +397,7 @@ sapp_desc sokol_main(int argc, char* argv[]) {
 		.event_cb = event,
 		.sample_count = 2,
 		.window_title = APP_NAME,
+		.win32_console_attach = 1,
 	};
 	return test;
 }

@@ -20,6 +20,11 @@
 
 */
 
+// external
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
 // I am speed.
 #include "th_dump.h"
 #include "th_array.h"
