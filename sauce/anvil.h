@@ -79,6 +79,7 @@ struct Entity {
 	F32 plant_stage;
 	B8 interactable;
 	B8 seed;
+	B8 resource;
 };
 
 struct Camera {
@@ -87,10 +88,15 @@ struct Camera {
 	F32 rotation;
 };
 
+struct FrameState {
+	Entity* player;
+	Entity* hovered_entity;
+};
+
 struct WorldState {
 	Entity entities[64];
 	U32 last_entity_id;
-	Entity* player;
+	Entity* player_temp; // todo - change to ID
 	U32 held_entity_id;
 };
 
@@ -307,6 +313,7 @@ static Entity* th_entity_create_plant() {
 	entity->render = 1;
 	entity->plant = 1;
 	entity->col = TH_WHITE;
+	entity->interactable = 1;
 	return entity;
 }
 
@@ -320,6 +327,7 @@ function Entity* EntityCreateResource() {
 	entity->rigid_body = 1;
 	entity->x_friction_mult = 4.0f;
 	entity->col = TH_WHITE;
+	entity->resource = 1;
 	return entity;
 }
 
@@ -327,7 +335,7 @@ static void th_world_init(WorldState* world) {
 	{
 		// player
 		Entity* entity = EntityCreate();
-		world->player = entity;
+		world->player_temp = entity;
 		entity->sprite = th_texture_sprite_get("arcane_player");
 		th_entity_set_bounds_from_sprite(entity);
 		entity->pos.y = 100.0f;
@@ -354,6 +362,11 @@ static void th_world_init(WorldState* world) {
 		Entity* entity = EntityCreateResource();
 		entity->pos.x = 100.0f;
 	}
+	{
+		// test plant
+		Entity* entity = th_entity_create_plant();
+		entity->pos.x = -50.0f;
+	}
 }
 
 static void sgp_draw_debug_rect_lines(Rng2F32 rect) {
@@ -367,6 +380,43 @@ static Rng2F32 EntityBoundsInWorld(const Entity* entity) {
 	Rng2F32 result = entity->bounds;
 	result = Shift2F32(result, entity->pos);
 	return result;
+}
+
+function void ProcessPlayerInteraction(TH_Coroutine* coro, FrameState* st) {
+	GameState* gs = game_state();
+
+	TH_CoroutineBegin(coro);
+
+	TH_CoroutineYieldUntil(coro, st->hovered_entity &&
+												 gs->key_pressed[SAPP_KEYCODE_E] &&
+												 st->hovered_entity->interactable);
+
+	// pick up hovered interactable
+	gs->world_state.held_entity_id = st->hovered_entity->id;
+	gs->key_pressed[SAPP_KEYCODE_E] = 0; // sponge keypress
+
+	TH_CoroutineYieldUntil(coro, gs->key_pressed[SAPP_KEYCODE_E]);
+
+	{
+		Entity* held_entity = EntityFromID(gs->world_state.held_entity_id);
+		Assert(held_entity);
+		if (held_entity->seed)
+		{
+			// place plant
+			Entity* plant = th_entity_create_plant();
+			plant->pos = held_entity->pos;
+			EntityDestroy(held_entity);
+		}
+		else
+		{
+			// throw it with velocity
+			gs->world_state.held_entity_id = 0;
+			held_entity->vel.x += st->player->x_dir * 100.0f;
+			held_entity->rigid_body = 1;
+		}
+	}
+
+	TH_CoroutineReset(coro);
 }
 
 #endif

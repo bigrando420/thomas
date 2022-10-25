@@ -14,6 +14,7 @@
 #define SQUARE(a) ((a) * (a))
 #define V4_EXPAND(vec) vec.x, vec.y, vec.z, vec.w
 
+
 static B8 float_equals(const F32& a, const F32& b, const F32& epsilon = 0.00001f) {
 	return (fabsf(a - b) < epsilon);
 }

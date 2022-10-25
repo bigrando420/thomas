@@ -131,6 +131,12 @@
     <ClInclude Include="sauce\th_telescope.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="sauce\third_party\sokol_time.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sauce\th_coroutine.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="sauce\anvil.cpp">

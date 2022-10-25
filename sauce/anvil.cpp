@@ -5,6 +5,7 @@
 #include "third_party/sokol_gp.h"
 #include "third_party/sokol_app.h"
 #include "third_party/sokol_glue.h"
+#include "third_party/sokol_time.h"
 
 #define HANDMADE_MATH_IMPLEMENTATION
 #include "third_party/HandmadeMath.h"
@@ -29,11 +30,13 @@ static void frame(void) {
 		th_world_init(world);
 	}
 
+	FrameState frame = { 0 };
+	frame.player = world->player_temp;
+
 	ForEach(entity, world->entities, Entity*) {
 		MemoryZeroStruct(&entity->frame);
 	}
 
-	Entity*& player = world->player;
 	const Vec2 window_size = { (F32)sapp_width(), (F32)sapp_height() };
 	gs->window_size = window_size;
 	F32 ratio = window_size.x / (F32)window_size.y;
@@ -41,20 +44,20 @@ static void frame(void) {
 	const Vec2 world_mouse = mouse_pos_in_worldspace();
 
 	// PLAYER INPUT
-	if (world->player) {
+	if (frame.player) {
 		if (gs->key_pressed[SAPP_KEYCODE_SPACE]) {
-			player->vel.y = 300.0f;
+			frame.player->vel.y = 300.0f;
 		}
 		Vec2 axis_input = { 0 };
 		if (gs->key_down[SAPP_KEYCODE_A]) {
 			axis_input.x -= 1.0f;
-			world->player->x_dir = -1;
+			frame.player->x_dir = -1;
 		}
 		if (gs->key_down[SAPP_KEYCODE_D]) {
 			axis_input.x += 1.0f;
-			world->player->x_dir = 1;
+			frame.player->x_dir = 1;
 		}
-		player->acc = axis_input * MOVE_SPEED;
+		frame.player->acc = axis_input * MOVE_SPEED;
 	}
 
 	// Particle Emit
@@ -129,66 +132,54 @@ static void frame(void) {
 	sgp_set_color(0.1f, 0.1f, 0.1f, 1.0f);
 	sgp_clear();
 
-	if (world->player) {
+	// PLAYER POST-PHYSICS UPDATE
+	if (frame.player) {
 		// camera update
-		gs->cam.pos.x = player->pos.x;
+		gs->cam.pos.x = frame.player->pos.x;
 		gs->cam.pos.y = 20.0f;
 
-		// player interact
+		// INTERACTION RECT
 		Rng2F32 interact_rect = { 0 };
 		interact_rect.max = Vec2(20, 20);
-		if (player->x_dir == -1)
+		if (frame.player->x_dir == -1)
 			interact_rect = Flip2F32(interact_rect);
-		//interact_rect = range2_center_left(interact_rect);
-		interact_rect = Shift2F32(interact_rect, player->pos);
+		interact_rect = Shift2F32(interact_rect, frame.player->pos);
 		sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
 		sgp_draw_debug_rect_lines(interact_rect);
-
-		// does interact_rect overlap with any interactable entities?
-		Entity* selected_entity = 0;
 		ForEach(entity, world->entities, Entity*) {
 			if (!entity->interactable || entity->id == world->held_entity_id)
 				continue;
-
 			if (Overlap2F32(EntityBoundsInWorld(entity), interact_rect)) {
-				selected_entity = entity;
+				frame.hovered_entity = entity;
 			}
 		}
+		// todo - pull out hovered entity into ID that way it doesn't go stale past the interaction step and instantly clears?
 
-		if (selected_entity && !EntityFromID(world->held_entity_id)) {
-			selected_entity->frame.render_highlight = 1; // can pick up feedback
+		// this needs verification
+		if (frame.hovered_entity)
+			frame.hovered_entity->frame.render_highlight = 1;
 
-			if (gs->key_pressed[SAPP_KEYCODE_E]) { // PICKUP
-				world->held_entity_id = selected_entity->id;
-				gs->key_pressed[SAPP_KEYCODE_E] = 0;
-			}
-		}
+		static TH_Coroutine coro = { 0 };
+		ProcessPlayerInteraction(&coro, &frame);
 
 		Entity* held_entity = EntityFromID(world->held_entity_id);
-		if (held_entity) {
-			if (held_entity->seed) { // SEED PLACEMENT
-				held_entity->pos.x = roundf(world_mouse.x);
-				held_entity->pos.y = 0.0f;
 
-				sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
-				sgp_draw_line(held_entity->pos.x, world_mouse.y, held_entity->pos.x, 0.0f);
+		// draw seed placement guide
+		if (held_entity && held_entity->seed)
+		{
+			held_entity->pos.x = roundf(world_mouse.x);
+			held_entity->pos.y = 0.0f;
+			sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
+			sgp_draw_line(held_entity->pos.x, world_mouse.y, held_entity->pos.x, 0.0f);
+		}
 
-				if (gs->mouse_pressed[SAPP_MOUSEBUTTON_LEFT]) {
-					Entity* plant = th_entity_create_plant();
-					plant->pos = held_entity->pos;
-					EntityDestroy(held_entity);
-				}
-			} else {
-				held_entity->vel = player->vel;
-				held_entity->pos = player->pos;
-				held_entity->pos.x += 7.0f * player->x_dir;
-				held_entity->pos.y += 10.0f;
-				if (gs->key_pressed[SAPP_KEYCODE_E]) { // THROW
-					world->held_entity_id = 0;
-					held_entity->vel.x += player->x_dir * 100.0f;
-					held_entity->rigid_body = 1;
-				}
-			}
+		// keep interactable held in hand
+		if (held_entity && held_entity->interactable && !held_entity->seed)
+		{
+			held_entity->vel = frame.player->vel;
+			held_entity->pos = frame.player->pos;
+			held_entity->pos.x += 7.0f * frame.player->x_dir;
+			held_entity->pos.y += 10.0f;
 		}
 	}
 
@@ -309,6 +300,8 @@ static void frame(void) {
 }
 
 static void init(void) {
+	stm_setup();
+
 	sg_desc sgdesc = { .context = sapp_sgcontext() };
 	sg_setup(&sgdesc);
 	if (!sg_isvalid()) {

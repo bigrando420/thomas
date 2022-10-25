@@ -63,6 +63,8 @@
     <ClInclude Include="sauce\third_party\sokol_app.h" />
     <ClInclude Include="sauce\third_party\sokol_gfx.h" />
     <ClInclude Include="sauce\third_party\sokol_gp.h" />
+    <ClInclude Include="sauce\third_party\sokol_time.h" />
+    <ClInclude Include="sauce\th_coroutine.h" />
     <ClInclude Include="sauce\th_dump.h" />
     <ClInclude Include="sauce\ext\cute_c2.h" />
     <ClInclude Include="sauce\ext\fmod\fmod.h" />
