@@ -1,6 +1,6 @@
 // No dependencies aside from sokol_time.h used in TH_CoroutineWait
-
 // idea originated from: https://www.chiark.greenend.org.uk/~sgtatham/coroutines.html
+// Implementation by Andrew Harter
 
 typedef struct TH_Coroutine TH_Coroutine;
 struct TH_Coroutine
