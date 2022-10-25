@@ -7,6 +7,9 @@
 #define GRAVITY 1000.0f
 #define DEFAULT_CAMERA_SCALE 5.0f
 
+global const S8 plant_stage_max = 6;
+global const F32 plant_growth_speed = 0.2f;
+
 #ifndef TH_SHIP
 //#define FUN_VAL
 //#define RENDER_COLLIDERS
@@ -61,9 +64,18 @@ struct EntityFrame {
 	B8 render_highlight;
 };
 
+enum EntityType {
+	ENTITY_null,
+	ENTITY_seed,
+	ENTITY_resource,
+	ENTITY_plant,
+};
+
 struct Entity {
 	U32 id;
 	EntityFrame frame; // per-frame data, zeroed out at the start of each frame
+	U32 children_entity_ids[8];
+	EntityType type;
 	B8 rigid_body;
 	Vec2 pos;
 	Vec2 vel;
@@ -75,11 +87,9 @@ struct Entity {
 	Sprite* sprite;
 	Vec4 col;
 	B8 x_dir;
-	B8 plant;
-	F32 plant_stage;
+	S8 plant_stage;
+	F32 zero_timer;
 	B8 interactable;
-	B8 seed;
-	B8 resource;
 };
 
 struct Camera {
@@ -164,6 +174,47 @@ function Entity* EntityFromID(U32 id) {
 		}
 	}
 	return 0;
+}
+
+function B8 EntityHasChildren(Entity* entity) {
+	ForEach(id, entity->children_entity_ids, U32*) {
+		if (*id != 0) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+function void EntityPushChild(Entity* entity, U32 child_id) {
+	U32* free_slot = 0;
+	ForEach(id, entity->children_entity_ids, U32*) {
+		if (*id == 0) {
+			free_slot = id;
+			break;
+		}
+	}
+	Assert(free_slot); // entity has reached max children
+	*free_slot = child_id;
+}
+
+function B8 EntityDetachFromParent(Entity* child)
+{
+	Assert(child && child->id);
+	WorldState* world = world_state();
+	// loop over all entities and clear self from children
+	B8 found = 0;
+	ForEach(entity, world->entities, Entity*)
+	{
+		ForEach(id, entity->children_entity_ids, U32*)
+		{
+			if (*id == child->id)
+			{
+				*id = 0;
+				found = 1;
+			}
+		}
+	}
+	return found;
 }
 
 static Rng2F32 camera_get_bounds() {
@@ -305,15 +356,14 @@ static void th_entity_set_bounds_from_sprite(Entity* entity) {
 	entity->render_rect = entity->bounds;
 }
 
-static Entity* th_entity_create_plant() {
+static Entity* EntityCreatePlant() {
 	WorldState* world = world_state();
 	Entity* entity = EntityCreate();
 	entity->sprite = th_texture_sprite_get("plant0"); // first default
 	th_entity_set_bounds_from_sprite(entity);
 	entity->render = 1;
-	entity->plant = 1;
 	entity->col = TH_WHITE;
-	entity->interactable = 1;
+	entity->type = ENTITY_plant;
 	return entity;
 }
 
@@ -327,7 +377,21 @@ function Entity* EntityCreateResource() {
 	entity->rigid_body = 1;
 	entity->x_friction_mult = 4.0f;
 	entity->col = TH_WHITE;
-	entity->resource = 1;
+	entity->type = ENTITY_resource;
+	return entity;
+}
+
+function Entity* EntityCreateSeed()
+{
+	Entity* entity = EntityCreate();
+	entity->bounds.max = Vec2(2.0f, 2.0f);
+	entity->bounds = range2_center_bottom(entity->bounds);
+	entity->render = 1;
+	entity->interactable = 1;
+	entity->rigid_body = 1;
+	entity->render_rect = entity->bounds;
+	entity->col = TH_WHITE;
+	entity->type = ENTITY_seed;
 	return entity;
 }
 
@@ -345,17 +409,8 @@ static void th_world_init(WorldState* world) {
 		entity->col = TH_WHITE;
 	}
 	{
-		// starter seed
-		Entity* entity = EntityCreate();
-		entity->bounds.max = Vec2(2.0f, 2.0f);
-		entity->bounds = range2_center_bottom(entity->bounds);
-		entity->render = 1;
-		entity->interactable = 1;
-		entity->seed = 1;
-		//entity->rigid_body = 1;
-		entity->render_rect = entity->bounds;
-		entity->col = TH_WHITE;
-		// world->held_seed = entity;
+		// is all begins with...
+		EntityCreateSeed();
 	}
 	{
 		// test resource
@@ -364,7 +419,7 @@ static void th_world_init(WorldState* world) {
 	}
 	{
 		// test plant
-		Entity* entity = th_entity_create_plant();
+		Entity* entity = EntityCreatePlant();
 		entity->pos.x = -50.0f;
 	}
 }
@@ -382,38 +437,78 @@ static Rng2F32 EntityBoundsInWorld(const Entity* entity) {
 	return result;
 }
 
-function void ProcessPlayerInteraction(TH_Coroutine* coro, FrameState* st) {
+function void ProcessPlayerInteraction(TH_Coroutine* coro, FrameState* frame) {
 	GameState* gs = game_state();
+	WorldState* world = world_state();
+	Entity* held_entity = EntityFromID(world->held_entity_id);
+	const Vec2 world_mouse = mouse_pos_in_worldspace();
 
 	TH_CoroutineBegin(coro);
 
-	TH_CoroutineYieldUntil(coro, st->hovered_entity &&
-												 gs->key_pressed[SAPP_KEYCODE_E] &&
-												 st->hovered_entity->interactable);
-
-	// pick up hovered interactable
-	gs->world_state.held_entity_id = st->hovered_entity->id;
-	gs->key_pressed[SAPP_KEYCODE_E] = 0; // sponge keypress
-
-	TH_CoroutineYieldUntil(coro, gs->key_pressed[SAPP_KEYCODE_E]);
-
+	while (!(gs->key_pressed[SAPP_KEYCODE_E] && frame->hovered_entity))
 	{
-		Entity* held_entity = EntityFromID(gs->world_state.held_entity_id);
+		if (frame->hovered_entity)
+			frame->hovered_entity->frame.render_highlight = 1;
+
+		TH_CoroutineYield(coro);
+	}
+	gs->key_pressed[SAPP_KEYCODE_E] = 0; // todo - auto sponge the press?
+
+	if (frame->hovered_entity->type == ENTITY_seed)
+	{
+		world->held_entity_id = frame->hovered_entity->id;
+		held_entity = EntityFromID(world->held_entity_id);
+
+		while (!gs->mouse_pressed[SAPP_MOUSEBUTTON_LEFT])
+		{
+			Assert(held_entity);
+			held_entity->pos.x = roundf(world_mouse.x);
+			held_entity->pos.y = 0.0f;
+			sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
+			sgp_draw_line(held_entity->pos.x, world_mouse.y, held_entity->pos.x, 0.0f);
+
+			TH_CoroutineYield(coro);
+		}
+		gs->mouse_pressed[SAPP_MOUSEBUTTON_LEFT] = 0;
+
 		Assert(held_entity);
-		if (held_entity->seed)
+		Entity* plant = EntityCreatePlant();
+		plant->pos = held_entity->pos;
+		EntityDestroy(held_entity);
+	}
+	else if (frame->hovered_entity->type == ENTITY_plant)
+	{
+		// snip snip
+		Vec2 pos = frame->hovered_entity->pos;
+		EntityDestroy(frame->hovered_entity);
+		Entity* seed = EntityCreateSeed();
+		seed->pos = pos;
+		seed->pos.y += 20.0f;
+	}
+	else if (frame->hovered_entity->type == ENTITY_resource)
+	{
+		world->held_entity_id = frame->hovered_entity->id;
+		held_entity = EntityFromID(world->held_entity_id);
+		EntityDetachFromParent(frame->hovered_entity);
+		// todo - parent id
+
+		while (!gs->key_pressed[SAPP_KEYCODE_E])
 		{
-			// place plant
-			Entity* plant = th_entity_create_plant();
-			plant->pos = held_entity->pos;
-			EntityDestroy(held_entity);
+			Assert(held_entity);
+			// @ship note - can I implicitly assert this just by accessing it? How can I get neat crashes when just straight up accessing a null pointer?
+			held_entity->vel = frame->player->vel;
+			held_entity->pos = frame->player->pos;
+			held_entity->pos.x += 7.0f * frame->player->x_dir;
+			held_entity->pos.y += 10.0f;
+
+			TH_CoroutineYield(coro);
 		}
-		else
-		{
-			// throw it with velocity
-			gs->world_state.held_entity_id = 0;
-			held_entity->vel.x += st->player->x_dir * 100.0f;
-			held_entity->rigid_body = 1;
-		}
+		gs->key_pressed[SAPP_KEYCODE_E] = 0;
+
+		Assert(held_entity);
+		gs->world_state.held_entity_id = 0;
+		held_entity->vel.x += frame->player->x_dir * 100.0f;
+		held_entity->rigid_body = 1;
 	}
 
 	TH_CoroutineReset(coro);

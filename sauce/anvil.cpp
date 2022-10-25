@@ -155,65 +155,63 @@ static void frame(void) {
 		}
 		// todo - pull out hovered entity into ID that way it doesn't go stale past the interaction step and instantly clears?
 
-		// this needs verification
-		if (frame.hovered_entity)
-			frame.hovered_entity->frame.render_highlight = 1;
-
 		static TH_Coroutine coro = { 0 };
 		ProcessPlayerInteraction(&coro, &frame);
-
-		Entity* held_entity = EntityFromID(world->held_entity_id);
-
-		// draw seed placement guide
-		if (held_entity && held_entity->seed)
-		{
-			held_entity->pos.x = roundf(world_mouse.x);
-			held_entity->pos.y = 0.0f;
-			sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
-			sgp_draw_line(held_entity->pos.x, world_mouse.y, held_entity->pos.x, 0.0f);
-		}
-
-		// keep interactable held in hand
-		if (held_entity && held_entity->interactable && !held_entity->seed)
-		{
-			held_entity->vel = frame.player->vel;
-			held_entity->pos = frame.player->pos;
-			held_entity->pos.x += 7.0f * frame.player->x_dir;
-			held_entity->pos.y += 10.0f;
-		}
 	}
 
 	// PLANT UPDATE
 	ForEach(plant, world->entities, Entity*) {
-		if (!plant->plant)
+		if (plant->type != ENTITY_plant)
 			continue;
 
-		const S8 final_stage = 6;
-
-		S8 previous_stage = floorf(plant->plant_stage);
-		plant->plant_stage += delta_t * 4.f;
-		if (plant->plant_stage > (F32)final_stage + 0.999f) {
-			plant->plant_stage = (F32)final_stage + 0.999f; // lol
+		S8 previous_stage = plant->plant_stage;
+		if (plant->zero_timer != 0)
+		{
+			plant->zero_timer -= delta_t;
+			if (plant->zero_timer <= 0)
+			{
+				plant->plant_stage++;
+				plant->zero_timer = 0;
+				if (plant->plant_stage < plant_stage_max)
+				{
+					plant->zero_timer = plant_growth_speed; // kick off another timer
+				}
+			}
+		}
+		else if (plant->plant_stage == 0)
+		{
+			plant->zero_timer = plant_growth_speed;
 		}
 
-		S8 stage = floorf(plant->plant_stage);
-		stage = ClampTop(stage, final_stage);
 		Sprite* plant_sprite = th_texture_sprite_get("plant0");
-		plant_sprite += stage;
+		plant_sprite += plant->plant_stage;
 		plant->sprite = plant_sprite;
 		
-		if (stage != previous_stage && stage == final_stage) {
+		B8 at_max_growth = plant->plant_stage == plant_stage_max;
+
+		if (plant->plant_stage != previous_stage && at_max_growth)
+		{
 			// @tooling - some kind of handle information from the sprite? maybe like a red pixel, or create another layer on information on top? Ideally I'd like to have another application running in the background where I can author this data.
 			Entity* res_a = EntityCreateResource();
 			res_a->pos = plant->pos;
 			res_a->pos.y += 13;
 			res_a->pos.x += -4;
 			res_a->rigid_body = 0;
+			EntityPushChild(plant, res_a->id);
+			// PushChild could actually put a parent ID in?
+			// just gotta be careful to keep them in sync via the helper funcs
+
 			Entity* res_b = EntityCreateResource();
 			res_b->pos = plant->pos;
 			res_b->pos.y += 36;
 			res_b->pos.x += 6;
 			res_b->rigid_body = 0;
+			EntityPushChild(plant, res_b->id);
+		}
+
+		if (at_max_growth && !EntityHasChildren(plant))
+		{
+			plant->interactable = 1;
 		}
 	}
 
