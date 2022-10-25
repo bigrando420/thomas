@@ -10,8 +10,14 @@ set(PROJECT_DATA_DIR data)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
-file(GLOB SOURCES ${PROJECT_SOURCE_DIR}/*.cpp)
+set(SOURCES ${PROJECT_SOURCE_DIR}/anvil.cpp
+  ${PROJECT_SOURCE_DIR}/third_party/telescope_light.c)
 file(GLOB DATA ${PROJECT_DATA_DIR}/*)
+
+set_source_files_properties(
+  ${PROJECT_SOURCE_DIR}/third_party/telescope_light.c
+  PROPERTIES LANGUAGE CXX
+)
 
 configure_file(${DATA} ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)
 
@@ -22,3 +28,6 @@ target_link_libraries(${PROJECT_NAME}
   ${X11_Xcursor_LIB}
   ${X11_Xi_LIB}
   "-ldl")
+
+target_include_directories(${PROJECT_NAME}
+  PRIVATE ${PROJECT_SOURCE_DIR})

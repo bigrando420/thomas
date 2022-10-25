@@ -1,2 +1,0 @@
-// implementaiton in here, just one big dump of functions? + detailed docs on each function
-// high-level API is built in the header files though, that way you can get a birds-eye view of how things work
