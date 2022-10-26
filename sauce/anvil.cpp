@@ -19,6 +19,7 @@
 /*
 
 - [ ] write a mini portable memory arena using malloc
+- [ ] get WASM build and figure out if I can use 64-bit shit?
 
 */
 
@@ -58,27 +59,6 @@ static void frame(void) {
 			frame.player->x_dir = 1;
 		}
 		frame.player->acc = axis_input * MOVE_SPEED;
-	}
-
-	// Particle Emit
-	for (int i = 0; i < gs->emitter_count; i++) {
-		Emitter* emitter = &gs->emitters[i];
-		
-		F32 freq_remainder = emitter->frequency - floorf(emitter->frequency);
-		B8 remainder = 0;
-		if (((F32)rand() / (F32)RAND_MAX) < freq_remainder)
-			remainder = 1;
-
-		U32 emit_amount = floorf(emitter->frequency) + remainder;
-		for (int j = 0; j < emit_amount; j++) {
-			gs->particle_count++;
-			if (gs->particle_count == ArrayCount(gs->particles))
-				gs->particle_count = 0;
-			Particle* new_particle = &gs->particles[gs->particle_count];
-			if (!float_is_zero(new_particle->life))
-				LOG("warning: particles are being overridden");
-			emitter->emit_func(new_particle, emitter);
-		}
 	}
 
 	// Entity Physics
@@ -215,6 +195,29 @@ static void frame(void) {
 		}
 	}
 
+	// Particle Emit
+	ForEach(emitter, world->entities, Entity*)
+	{
+		if (emitter->type != ENTITY_emitter)
+			continue;
+
+		F32 freq_remainder = emitter->frequency - floorf(emitter->frequency);
+		B8 remainder = 0;
+		if (((F32)rand() / (F32)RAND_MAX) < freq_remainder)
+			remainder = 1;
+
+		U32 emit_amount = floorf(emitter->frequency) + remainder;
+		for (int j = 0; j < emit_amount; j++) {
+			gs->particle_count++;
+			if (gs->particle_count == ArrayCount(gs->particles))
+				gs->particle_count = 0;
+			Particle* new_particle = &gs->particles[gs->particle_count];
+			if (!float_is_zero(new_particle->life))
+				LOG("warning: particles are being overridden");
+			emitter->emit_func(new_particle, emitter);
+		}
+	}
+
 	// Particle Render
 	for (int i = 0; i < ArrayCount(gs->particles); i++) {
 		Particle* particle = &gs->particles[i];
@@ -295,6 +298,15 @@ static void frame(void) {
 	memset(&gs->key_released, 0, sizeof(gs->key_released));
 	memset(&gs->mouse_pressed, 0, sizeof(gs->mouse_pressed));
 	memset(&gs->mouse_released, 0, sizeof(gs->mouse_released));
+
+	// @arena
+	// temp single-frame clear of entites
+	ForEach(entity, world->entities, Entity*)
+	{
+		if (!entity->single_frame_lifetime)
+			continue;
+		EntityDestroy(entity);
+	}
 }
 
 static void init(void) {
@@ -350,9 +362,9 @@ static void init(void) {
 
 	{
 		// background emitter
-		Emitter* emitter = TH_ARRAY_PUSH(gs->emitters, gs->emitter_count);
-		emitter->emit_func = emitter_ambient_screen;
-		emitter->frequency = 10.0f;
+		Entity* emit = EntityCreateEmitter();
+		emit->emit_func = emitter_ambient_screen;
+		emit->frequency = 10.0f;
 	}
 
 	gs->cam.scale = DEFAULT_CAMERA_SCALE;

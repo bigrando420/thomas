@@ -137,6 +137,24 @@
     <ClInclude Include="sauce\th_coroutine.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="sauce\third_party\telescope\base\base_types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sauce\third_party\telescope\base\base_strings.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sauce\third_party\telescope\base\base_memory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sauce\third_party\telescope\base\base_math.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sauce\third_party\telescope\base\base_inc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sauce\third_party\telescope\base\base_ctx_crack.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="sauce\anvil.cpp">
@@ -173,6 +191,21 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="sauce\third_party\telescope_light.h">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sauce\third_party\telescope\base\base_types.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sauce\third_party\telescope\base\base_strings.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sauce\third_party\telescope\base\base_memory.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sauce\third_party\telescope\base\base_math.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sauce\third_party\telescope\base\base_inc.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

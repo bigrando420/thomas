@@ -20,16 +20,9 @@ global const F32 plant_growth_speed = 0.2f;
 #define TH_BLACK Vec4(0.0f, 0.0f, 0.0f, 1.0f)
 #define TH_WHITE Vec4(1.0f, 1.0f, 1.0f, 1.0f)
 
-typedef struct Emitter Emitter;
+typedef struct Entity Entity;
 typedef struct Particle Particle;
-typedef void (*ParticleEmitterFunc)(Particle*, Emitter*);
-#define PARTICLE_EMITTER_FUNC(function_name) static void function_name(Particle* particle, Emitter* emitter)
-
-struct Emitter {
-	Vec2 pos;
-	F32 frequency;
-	ParticleEmitterFunc emit_func;
-};
+typedef void (*ParticleEmitterFunc)(Particle*, Entity*);
 
 struct Particle {
 	Vec2 pos;
@@ -38,7 +31,7 @@ struct Particle {
 	F32 start_life;
 	F32 life;
 	F32 size_mult;
-	// flags;
+	// flags
 	B8 fade_in;
 	B8 fade_out;
 };
@@ -69,6 +62,7 @@ enum EntityType {
 	ENTITY_seed,
 	ENTITY_resource,
 	ENTITY_plant,
+	ENTITY_emitter,
 };
 
 struct Entity {
@@ -76,6 +70,7 @@ struct Entity {
 	EntityFrame frame; // per-frame data, zeroed out at the start of each frame
 	U32 children_entity_ids[8];
 	EntityType type;
+	B8 single_frame_lifetime; // @arena
 	B8 rigid_body;
 	Vec2 pos;
 	Vec2 vel;
@@ -90,6 +85,9 @@ struct Entity {
 	S8 plant_stage;
 	F32 zero_timer;
 	B8 interactable;
+	// emitter
+	F32 frequency;
+	ParticleEmitterFunc emit_func;
 };
 
 struct Camera {
@@ -110,12 +108,16 @@ struct WorldState {
 	U32 held_entity_id;
 };
 
+// I reckon the game state and the world could be merged into one. It's really just where I choose to store the data that matters. When creating entities that are bound to the world, chuck em on the world arena. If I want an entity in the root game menu, slap it in there.
+// I can really just have the world going constantly, and only a select few things bound to the scope of it. There's no point creating artificial structure for myself ahead of time.
+
+// todo - fun obsidian tinkering (later today?)
+// new site with .md -> .html and maybe some kind of obsidian extension?
+
 struct GameState {
 	WorldState world_state;
 	B8 key_down[SAPP_KEYCODE_MENU];
 	B8 mouse_down[SAPP_MOUSEBUTTON_MIDDLE];
-	Emitter emitters[16];
-	U32 emitter_count;
 	Particle particles[2048];
 	U32 particle_count;
 	Camera cam;
@@ -226,13 +228,25 @@ static Rng2F32 camera_get_bounds() {
 	return cam;
 }
 
-PARTICLE_EMITTER_FUNC(emitter_ambient_screen) {
+function void emitter_ambient_screen(Particle* particle, Entity* emitter)
+{
 	Rng2F32 bounds = camera_get_bounds();
 	particle->pos.x = float_random_range(bounds.min.x, bounds.max.x);
 	particle->pos.y = float_random_range(bounds.min.y, bounds.max.y);
 	particle->vel = Vec2(float_random_range(-1.f, 1.f), float_random_range(2.f, 4.f));
 	particle->col = Vec4(0.7f, 0.7f, 0.7f, 1.0f);
 	particle->start_life = particle->life = 2.f;
+	particle->fade_in = 1;
+	particle->fade_out = 1;
+	particle->size_mult = 1.f;
+}
+
+function void EmitterPlantSheer(Particle* particle, Entity* emitter)
+{
+	particle->pos = emitter->pos;
+	particle->vel = Vec2(float_random_range(-20.f, 20.f), float_random_range(-20.f, 20.f));
+	particle->col = Vec4(0.7f, 0.7f, 0.7f, 1.0f);
+	particle->start_life = particle->life = 0.2f;
 	particle->fade_in = 1;
 	particle->fade_out = 1;
 	particle->size_mult = 1.f;
@@ -395,33 +409,41 @@ function Entity* EntityCreateSeed()
 	return entity;
 }
 
+function Entity* EntityCreateEmitter()
+{
+	Entity* entity = EntityCreate();
+	entity->type = ENTITY_emitter;
+	return entity;
+}
+
 static void th_world_init(WorldState* world) {
-	{
-		// player
-		Entity* entity = EntityCreate();
-		world->player_temp = entity;
-		entity->sprite = th_texture_sprite_get("arcane_player");
-		th_entity_set_bounds_from_sprite(entity);
-		entity->pos.y = 100.0f;
-		entity->rigid_body = 1;
-		entity->render = 1;
-		entity->x_friction_mult = 15.0f;
-		entity->col = TH_WHITE;
-	}
-	{
-		// is all begins with...
-		EntityCreateSeed();
-	}
-	{
-		// test resource
-		Entity* entity = EntityCreateResource();
-		entity->pos.x = 100.0f;
-	}
-	{
-		// test plant
-		Entity* entity = EntityCreatePlant();
-		entity->pos.x = -50.0f;
-	}
+	// player
+	Entity* entity = EntityCreate();
+	world->player_temp = entity;
+	entity->sprite = th_texture_sprite_get("arcane_player");
+	th_entity_set_bounds_from_sprite(entity);
+	entity->pos.y = 100.0f;
+	entity->rigid_body = 1;
+	entity->render = 1;
+	entity->x_friction_mult = 15.0f;
+	entity->col = TH_WHITE;
+
+	// is all begins with...
+	entity = EntityCreateSeed();
+	
+	// test resource
+	entity = EntityCreateResource();
+	entity->pos.x = 100.0f;
+	
+	// test plant
+	entity = EntityCreatePlant();
+	entity->pos.x = 20;
+	entity->plant_stage = plant_stage_max;
+	entity = EntityCreatePlant();
+	entity->pos.x = 50;
+	entity->plant_stage = plant_stage_max;
+	entity = EntityCreatePlant();
+	entity->pos.x = -50.0f;
 }
 
 static void sgp_draw_debug_rect_lines(Rng2F32 rect) {
@@ -479,11 +501,24 @@ function void ProcessPlayerInteraction(TH_Coroutine* coro, FrameState* frame) {
 	else if (frame->hovered_entity->type == ENTITY_plant)
 	{
 		// snip snip
-		Vec2 pos = frame->hovered_entity->pos;
+		Vec2 spawn_pos = frame->hovered_entity->pos;
 		EntityDestroy(frame->hovered_entity);
 		Entity* seed = EntityCreateSeed();
-		seed->pos = pos;
-		seed->pos.y += 20.0f;
+		spawn_pos.y += 20.0f;
+		seed->pos = spawn_pos;
+
+		// fire off emitter
+		Entity* emit = EntityCreateEmitter();
+		emit->pos = spawn_pos;
+		emit->emit_func = EmitterPlantSheer;
+		emit->frequency = 20.0f;
+		emit->single_frame_lifetime = 1;
+
+		// wait
+
+		// todo @polish @thread ? I almost just want to fire off another thread of execution here so I can do the timer elsewhere instead of stopping this coro
+		// duplication animation. wait 1 second, but animate it shaking like a poke ball, then poppin out once done
+		// it can't be stopping this coroutine though...
 	}
 	else if (frame->hovered_entity->type == ENTITY_resource)
 	{
