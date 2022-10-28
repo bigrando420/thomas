@@ -20,14 +20,9 @@ global const F32 plant_growth_speed = 0.2f;
 #define TH_BLACK Vec4(0.0f, 0.0f, 0.0f, 1.0f)
 #define TH_WHITE Vec4(1.0f, 1.0f, 1.0f, 1.0f)
 
-typedef struct Emitter Emitter;
+typedef struct Entity Entity;
 typedef struct Particle Particle;
-typedef void (*ParticleEmitterFunc)(Particle*, Emitter*);
-struct Emitter {
-	Vec2 pos;
-	F32 frequency;
-	ParticleEmitterFunc emit_func;
-};
+typedef void (*ParticleEmitterFunc)(Particle*, Entity*);
 
 struct Particle {
 	Vec2 pos;
@@ -59,6 +54,7 @@ struct RenderRect {
 };
 
 struct EntityFrame {
+	// per-frame data, zeroed out at the start of each frame
 	B8 render_highlight;
 };
 
@@ -70,19 +66,13 @@ enum EntityType {
 	ENTITY_emitter,
 };
 
-typedef struct Entity Entity;
-typedef struct EntityNode EntityNode;
-struct EntityNode {
-	EntityNode* next;
-	Entity* entity;
-};
-
-struct Entity {
+struct Entity
+{
 	U32 id;
-	EntityFrame frame; // per-frame data, zeroed out at the start of each frame
+	EntityFrame frame;
 	U32 children_entity_ids[8];
 	EntityType type;
-	B8 destroy_at_frame_end; // @arena?
+	U32 lifetime_ticks_remaining;
 	B8 rigid_body;
 	Vec2 pos;
 	Vec2 vel;
@@ -97,6 +87,8 @@ struct Entity {
 	S8 plant_stage;
 	F32 zero_timer;
 	B8 interactable;
+	ParticleEmitterFunc emit_func;
+	F32 frequency;
 };
 
 struct Camera {
@@ -128,12 +120,8 @@ struct GameState {
 	Sprite sprites[64];
 	U32 sprite_count;
 
-	Emitter emitters[16];
-	U32 emitter_count;
 	Particle particles[2048];
 	U32 particle_count;
-
-	EntityNode* first_entity;
 
 	// per-frame
 	Vec2 mouse_pos;
@@ -187,7 +175,7 @@ function Entity* EntityCreate()
 	WorldState* world = world_state();
 	Assert(world->last_entity_id + 1 < U32Max); // todo - more sophisticated IDs
 	world->last_entity_id++;
-	ForEach(entity, world->entities, Entity*) {
+	ForEachFlat(entity, world->entities, Entity*) {
 		if (!entity->id) {
 			entity->id = world->last_entity_id;
 			return entity;
@@ -205,7 +193,7 @@ function Entity* EntityFromID(U32 id) {
 	if (id == 0)
 		return 0;
 	WorldState* world = world_state();
-	ForEach(entity, world->entities, Entity*) {
+	ForEachFlat(entity, world->entities, Entity*) {
 		if (entity->id == id) {
 			return entity;
 		}
@@ -214,7 +202,7 @@ function Entity* EntityFromID(U32 id) {
 }
 
 function B8 EntityHasChildren(Entity* entity) {
-	ForEach(id, entity->children_entity_ids, U32*) {
+	ForEachFlat(id, entity->children_entity_ids, U32*) {
 		if (*id != 0) {
 			return 1;
 		}
@@ -224,7 +212,7 @@ function B8 EntityHasChildren(Entity* entity) {
 
 function void EntityPushChild(Entity* entity, U32 child_id) {
 	U32* free_slot = 0;
-	ForEach(id, entity->children_entity_ids, U32*) {
+	ForEachFlat(id, entity->children_entity_ids, U32*) {
 		if (*id == 0) {
 			free_slot = id;
 			break;
@@ -240,9 +228,9 @@ function B8 EntityDetachFromParent(Entity* child)
 	WorldState* world = world_state();
 	// loop over all entities and clear self from children
 	B8 found = 0;
-	ForEach(entity, world->entities, Entity*)
+	ForEachFlat(entity, world->entities, Entity*)
 	{
-		ForEach(id, entity->children_entity_ids, U32*)
+		ForEachFlat(id, entity->children_entity_ids, U32*)
 		{
 			if (*id == child->id)
 			{
@@ -263,7 +251,7 @@ static Rng2F32 camera_get_bounds() {
 	return cam;
 }
 
-function void emitter_ambient_screen(Particle* particle, Emitter* emitter)
+function void emitter_ambient_screen(Particle* particle, Entity* emitter)
 {
 	Rng2F32 bounds = camera_get_bounds();
 	particle->pos.x = float_random_range(bounds.min.x, bounds.max.x);
@@ -276,7 +264,7 @@ function void emitter_ambient_screen(Particle* particle, Emitter* emitter)
 	particle->size_mult = 1.f;
 }
 
-function void EmitterPlantSheer(Particle* particle, Emitter* emitter)
+function void EmitterPlantSheer(Particle* particle, Entity* emitter)
 {
 	particle->pos = emitter->pos;
 	particle->vel = Vec2(float_random_range(-20.f, 20.f), float_random_range(-20.f, 20.f));
@@ -444,11 +432,11 @@ function Entity* EntityCreateSeed()
 	return entity;
 }
 
-function Emitter* CreateEmitter()
+function Entity* EntityCreateEmitter()
 {
-	GameState* gs = game_state();
-	Emitter* emit = TH_ARRAY_PUSH(gs->emitters, gs->emitter_count);
-	return emit;
+	Entity* entity = EntityCreate();
+	entity->type = ENTITY_emitter;
+	return entity;
 }
 
 static void th_world_init(WorldState* world) {
@@ -543,17 +531,13 @@ function void ProcessPlayerInteraction(TH_Coroutine* coro, FrameState* frame) {
 		seed->pos = spawn_pos;
 
 		// fire off emitter
-		Emitter* emit = CreateEmitter();
+		Entity* emit = EntityCreateEmitter();
 		emit->pos = spawn_pos;
 		emit->emit_func = EmitterPlantSheer;
 		emit->frequency = 20.0f;
-		// todo - frame arena
+		emit->lifetime_ticks_remaining = 1;
 
-		// wait
-
-		// todo @polish @thread ? I almost just want to fire off another thread of execution here so I can do the timer elsewhere instead of stopping this coro
-		// duplication animation. wait 1 second, but animate it shaking like a poke ball, then poppin out once done
-		// it can't be stopping this coroutine though...
+		// todo @coroutine - pokeball
 	}
 	else if (frame->hovered_entity->type == ENTITY_resource)
 	{

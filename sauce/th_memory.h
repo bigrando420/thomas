@@ -38,7 +38,7 @@ function void M_ArenaInit(M_Arena* arena, void* backing_buffer, size_t backing_b
 	arena->buffer_length = backing_buffer_length;
 }
 
-function void* M_ArenaPush(M_Arena* arena, size_t size)
+function void* M_ArenaAlloc(M_Arena* arena, size_t size)
 {
 	size_t align = 2 * sizeof(void*);
 	uintptr_t cur_ptr = (uintptr_t)arena->buffer + (uintptr_t)arena->offset;

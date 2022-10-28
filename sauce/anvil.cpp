@@ -21,16 +21,20 @@
 - [x] write a mini portable memory arena using malloc
 - [ ] get WASM build and figure out if I can use 64-bit shit?
 
-what's my issue here?
+### On entities
+Pulling them out into memory arenas and giving them defined lifetimes was a mistake. Keep it simple, what was the feature I needed - I needed to have a timer on an entity for destruction, and for it to last one frame. Just make that an entity feature!!
 
-I want the lifetime of an emitter to be tied up on arenas.
+As for entities that exist on the main menu, just have a seperate batch ya silly fukin goose.
+
+KEEP IT SIMPLE.
 
 */
 
 static void frame(void) {
 	GameState* gs = game_state();
 	WorldState* world = world_state();
-	if (gs->key_pressed[SAPP_KEYCODE_B]) {
+	if (gs->key_pressed[SAPP_KEYCODE_B])
+	{
 		MemoryZeroStruct(world);
 		th_world_init(world);
 	}
@@ -38,10 +42,9 @@ static void frame(void) {
 	FrameState frame = { 0 };
 	frame.player = world->player_temp;
 
-	// clear stale entities
-
-
-	ForEach(entity, world->entities, Entity*) {
+	// zero frame data
+	ForEachFlat(entity, world->entities, Entity*)
+	{
 		MemoryZeroStruct(&entity->frame);
 	}
 
@@ -69,7 +72,7 @@ static void frame(void) {
 	}
 
 	// Entity Physics
-	ForEach(entity, world->entities, Entity*) {
+	ForEachFlat(entity, world->entities, Entity*) {
 		if (!entity->rigid_body)
 			continue;
 
@@ -133,7 +136,7 @@ static void frame(void) {
 		interact_rect = Shift2F32(interact_rect, frame.player->pos);
 		sgp_set_color(1.0f, 1.0f, 1.0f, 1.0f);
 		sgp_draw_debug_rect_lines(interact_rect);
-		ForEach(entity, world->entities, Entity*) {
+		ForEachFlat(entity, world->entities, Entity*) {
 			if (!entity->interactable || entity->id == world->held_entity_id)
 				continue;
 			if (Overlap2F32(EntityBoundsInWorld(entity), interact_rect)) {
@@ -147,7 +150,7 @@ static void frame(void) {
 	}
 
 	// PLANT UPDATE
-	ForEach(plant, world->entities, Entity*) {
+	ForEachFlat(plant, world->entities, Entity*) {
 		if (plant->type != ENTITY_plant)
 			continue;
 
@@ -203,9 +206,11 @@ static void frame(void) {
 	}
 
 	// Particle Emit
-	for (int i = 0; i < gs->emitter_count; i++)
+	ForEachFlat(emitter, world->entities, Entity*)
 	{
-		Emitter* emitter = &gs->emitters[i];
+		if (emitter->type != ENTITY_emitter)
+			continue;
+
 		F32 freq_remainder = emitter->frequency - floorf(emitter->frequency);
 		B8 remainder = 0;
 		if (((F32)rand() / (F32)RAND_MAX) < freq_remainder)
@@ -253,7 +258,7 @@ static void frame(void) {
 	sgp_draw_line(-200.f, 0.0f, 200.0f, 0.0f); // ground line
 
 	// Entity Render
-	ForEach(entity, world->entities, Entity*) {
+	ForEachFlat(entity, world->entities, Entity*) {
 		if (!entity->render)
 			continue;
 
@@ -306,12 +311,17 @@ static void frame(void) {
 
 	M_ArenaClear(TH_FrameArena());
 
-	// temp single-frame clear of entites
-	ForEach(entity, world->entities, Entity*)
+	// tick down entity lifetimes
+	ForEachFlat(entity, world->entities, Entity*)
 	{
-		if (!entity->destroy_at_frame_end)
+		if (entity->lifetime_ticks_remaining == 0)
 			continue;
-		EntityDestroy(entity);
+
+		entity->lifetime_ticks_remaining--;
+		if (entity->lifetime_ticks_remaining == 0)
+		{
+			EntityDestroy(entity);
+		}
 	}
 }
 
@@ -390,7 +400,7 @@ static void init(void) {
 
 	{
 		// background emitter
-		Emitter* emit = CreateEmitter();
+		Entity* emit = EntityCreateEmitter();
 		emit->emit_func = emitter_ambient_screen;
 		emit->frequency = 10.0f;
 	}
