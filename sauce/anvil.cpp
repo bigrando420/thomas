@@ -16,6 +16,8 @@
 #include "thomas.h"
 #include "anvil.h"
 
+#include "cgame.c"
+
 /*
 
 - [x] write a mini portable memory arena using malloc
@@ -36,7 +38,7 @@ static void frame(void) {
 	if (gs->key_pressed[SAPP_KEYCODE_B])
 	{
 		MemoryZeroStruct(world);
-		th_world_init(world);
+		WorldInit(world);
 	}
 
 	FrameState frame = { 0 };
@@ -145,8 +147,22 @@ static void frame(void) {
 		}
 		// todo - pull out hovered entity into ID that way it doesn't go stale past the interaction step and instantly clears?
 
-		static TH_Coroutine coro = { 0 };
+		static Coroutine coro = { 0 };
 		ProcessPlayerInteraction(&coro, &frame);
+	}
+
+	// ENTITY UPDATE
+	ForEachFlat(entity, world->entities, Entity*)
+	{
+		if (entity->id == 0)
+			continue;
+
+		switch(entity->type)
+		{
+		case ENTITY_seed:
+			CoroSeedUpdate(entity);
+			break;
+		}
 	}
 
 	// PLANT UPDATE
@@ -208,7 +224,7 @@ static void frame(void) {
 	// Particle Emit
 	ForEachFlat(emitter, world->entities, Entity*)
 	{
-		if (emitter->type != ENTITY_emitter)
+		if (emitter->type != ENTITY_particle_emitter)
 			continue;
 
 		F32 freq_remainder = emitter->frequency - floorf(emitter->frequency);
@@ -407,7 +423,7 @@ static void init(void) {
 
 	gs->cam.scale = DEFAULT_CAMERA_SCALE;
 
-	th_world_init(world);
+	WorldInit(world);
 }
 
 static void cleanup(void) {

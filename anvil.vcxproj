@@ -50,6 +50,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="sauce\anvil.h" />
+    <ClInclude Include="sauce\cgame.c" />
     <ClInclude Include="sauce\ext\telescope\base\base_atlas.h" />
     <ClInclude Include="sauce\ext\telescope\base\base_ctx_crack.h" />
     <ClInclude Include="sauce\ext\telescope\base\base_inc.h" />

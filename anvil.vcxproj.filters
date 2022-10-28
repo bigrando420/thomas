@@ -155,6 +155,9 @@
     <ClInclude Include="sauce\third_party\telescope\base\base_ctx_crack.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="sauce\cgame.c">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="sauce\anvil.cpp">
