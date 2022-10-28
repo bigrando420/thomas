@@ -18,8 +18,12 @@
 
 /*
 
-- [ ] write a mini portable memory arena using malloc
+- [x] write a mini portable memory arena using malloc
 - [ ] get WASM build and figure out if I can use 64-bit shit?
+
+what's my issue here?
+
+I want the lifetime of an emitter to be tied up on arenas.
 
 */
 
@@ -33,6 +37,9 @@ static void frame(void) {
 
 	FrameState frame = { 0 };
 	frame.player = world->player_temp;
+
+	// clear stale entities
+
 
 	ForEach(entity, world->entities, Entity*) {
 		MemoryZeroStruct(&entity->frame);
@@ -196,11 +203,9 @@ static void frame(void) {
 	}
 
 	// Particle Emit
-	ForEach(emitter, world->entities, Entity*)
+	for (int i = 0; i < gs->emitter_count; i++)
 	{
-		if (emitter->type != ENTITY_emitter)
-			continue;
-
+		Emitter* emitter = &gs->emitters[i];
 		F32 freq_remainder = emitter->frequency - floorf(emitter->frequency);
 		B8 remainder = 0;
 		if (((F32)rand() / (F32)RAND_MAX) < freq_remainder)
@@ -299,11 +304,12 @@ static void frame(void) {
 	memset(&gs->mouse_pressed, 0, sizeof(gs->mouse_pressed));
 	memset(&gs->mouse_released, 0, sizeof(gs->mouse_released));
 
-	// @arena
+	M_ArenaClear(TH_FrameArena());
+
 	// temp single-frame clear of entites
 	ForEach(entity, world->entities, Entity*)
 	{
-		if (!entity->single_frame_lifetime)
+		if (!entity->destroy_at_frame_end)
 			continue;
 		EntityDestroy(entity);
 	}
@@ -326,12 +332,34 @@ static void init(void) {
 		exit(-1);
 	}
 
-	// ENTRY
+	// Allocate Game Memory
+	#define PERMANENT_ARENA_SIZE Megabytes(32)
+	#define WORLD_ARENA_SIZE Megabytes(32)
+	#define FRAME_ARENA_SIZE Megabytes(32)
+
+	size_t game_memory_size = PERMANENT_ARENA_SIZE + WORLD_ARENA_SIZE + FRAME_ARENA_SIZE;
+	U8* base_memory = (U8*)malloc(game_memory_size);
+	U8* memory = base_memory;
+	MemoryZero(memory, game_memory_size);
+
+	M_ArenaInit(&game_memory.permanent_arena, memory, PERMANENT_ARENA_SIZE);
+	memory += PERMANENT_ARENA_SIZE;
+
+	M_ArenaInit(&game_memory.world_arena, memory, WORLD_ARENA_SIZE);
+	memory += WORLD_ARENA_SIZE;
+
+	M_ArenaInit(&game_memory.frame_arena, memory, FRAME_ARENA_SIZE);
+	memory += FRAME_ARENA_SIZE;
+
+	Assert(memory - base_memory == game_memory_size);
+
 	GameState* gs = game_state();
 	WorldState* world = world_state();
 
-	printf("balls");
+	// todo - allocate this on the arenas, not the globals.
 
+
+	// TEXTURES
 	TextureAtlas* atlas = th_texture_atlas_load("dump.png");
 	// plant stages
 	Rng2F32 sub_rect = Rng2F32(Vec2(), Vec2(16, 64));
@@ -362,7 +390,7 @@ static void init(void) {
 
 	{
 		// background emitter
-		Entity* emit = EntityCreateEmitter();
+		Emitter* emit = CreateEmitter();
 		emit->emit_func = emitter_ambient_screen;
 		emit->frequency = 10.0f;
 	}
@@ -375,6 +403,7 @@ static void init(void) {
 static void cleanup(void) {
 	sgp_shutdown();
 	sg_shutdown();
+	free(game_memory.permanent_arena.buffer);
 }
 
 static void event(const sapp_event* ev) {

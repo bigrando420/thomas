@@ -20,9 +20,14 @@ global const F32 plant_growth_speed = 0.2f;
 #define TH_BLACK Vec4(0.0f, 0.0f, 0.0f, 1.0f)
 #define TH_WHITE Vec4(1.0f, 1.0f, 1.0f, 1.0f)
 
-typedef struct Entity Entity;
+typedef struct Emitter Emitter;
 typedef struct Particle Particle;
-typedef void (*ParticleEmitterFunc)(Particle*, Entity*);
+typedef void (*ParticleEmitterFunc)(Particle*, Emitter*);
+struct Emitter {
+	Vec2 pos;
+	F32 frequency;
+	ParticleEmitterFunc emit_func;
+};
 
 struct Particle {
 	Vec2 pos;
@@ -65,12 +70,19 @@ enum EntityType {
 	ENTITY_emitter,
 };
 
+typedef struct Entity Entity;
+typedef struct EntityNode EntityNode;
+struct EntityNode {
+	EntityNode* next;
+	Entity* entity;
+};
+
 struct Entity {
 	U32 id;
 	EntityFrame frame; // per-frame data, zeroed out at the start of each frame
 	U32 children_entity_ids[8];
 	EntityType type;
-	B8 single_frame_lifetime; // @arena
+	B8 destroy_at_frame_end; // @arena?
 	B8 rigid_body;
 	Vec2 pos;
 	Vec2 vel;
@@ -85,9 +97,6 @@ struct Entity {
 	S8 plant_stage;
 	F32 zero_timer;
 	B8 interactable;
-	// emitter
-	F32 frequency;
-	ParticleEmitterFunc emit_func;
 };
 
 struct Camera {
@@ -108,23 +117,24 @@ struct WorldState {
 	U32 held_entity_id;
 };
 
-// I reckon the game state and the world could be merged into one. It's really just where I choose to store the data that matters. When creating entities that are bound to the world, chuck em on the world arena. If I want an entity in the root game menu, slap it in there.
-// I can really just have the world going constantly, and only a select few things bound to the scope of it. There's no point creating artificial structure for myself ahead of time.
-
-// todo - fun obsidian tinkering (later today?)
-// new site with .md -> .html and maybe some kind of obsidian extension?
-
 struct GameState {
 	WorldState world_state;
 	B8 key_down[SAPP_KEYCODE_MENU];
 	B8 mouse_down[SAPP_MOUSEBUTTON_MIDDLE];
-	Particle particles[2048];
-	U32 particle_count;
 	Camera cam;
+
 	TextureAtlas atlases[16];
 	U32 atlas_count;
 	Sprite sprites[64];
 	U32 sprite_count;
+
+	Emitter emitters[16];
+	U32 emitter_count;
+	Particle particles[2048];
+	U32 particle_count;
+
+	EntityNode* first_entity;
+
 	// per-frame
 	Vec2 mouse_pos;
 	Vec2 window_size;
@@ -134,7 +144,6 @@ struct GameState {
 	B8 mouse_released[SAPP_MOUSEBUTTON_MIDDLE];
 };
 
-// wrapped globals, will be trivial to swap out later
 static GameState* game_state() {
 	static GameState gs = { 0 };
 	return &gs;
@@ -144,11 +153,37 @@ static WorldState* world_state() {
 	return &gs->world_state;
 }
 
+typedef struct GameMemory GameMemory;
+struct GameMemory
+{
+	M_Arena permanent_arena;
+	M_Arena world_arena;
+	M_Arena frame_arena;
+};
+global GameMemory game_memory = { 0 };
+
+function M_Arena* TH_PermanentArena()
+{
+	return &game_memory.permanent_arena;
+}
+function M_Arena* TH_WorldArena()
+{
+	return &game_memory.world_arena;
+}
+function M_Arena* TH_FrameArena()
+{
+	return &game_memory.frame_arena;
+}
+
 #ifdef FUN_VAL
 static F32 fun_val = 0.0f;
 #endif
 
-function Entity* EntityCreate() {
+// to move this system to pooling, or not to? That is the question.
+// 
+
+function Entity* EntityCreate()
+{
 	WorldState* world = world_state();
 	Assert(world->last_entity_id + 1 < U32Max); // todo - more sophisticated IDs
 	world->last_entity_id++;
@@ -228,7 +263,7 @@ static Rng2F32 camera_get_bounds() {
 	return cam;
 }
 
-function void emitter_ambient_screen(Particle* particle, Entity* emitter)
+function void emitter_ambient_screen(Particle* particle, Emitter* emitter)
 {
 	Rng2F32 bounds = camera_get_bounds();
 	particle->pos.x = float_random_range(bounds.min.x, bounds.max.x);
@@ -241,7 +276,7 @@ function void emitter_ambient_screen(Particle* particle, Entity* emitter)
 	particle->size_mult = 1.f;
 }
 
-function void EmitterPlantSheer(Particle* particle, Entity* emitter)
+function void EmitterPlantSheer(Particle* particle, Emitter* emitter)
 {
 	particle->pos = emitter->pos;
 	particle->vel = Vec2(float_random_range(-20.f, 20.f), float_random_range(-20.f, 20.f));
@@ -409,11 +444,11 @@ function Entity* EntityCreateSeed()
 	return entity;
 }
 
-function Entity* EntityCreateEmitter()
+function Emitter* CreateEmitter()
 {
-	Entity* entity = EntityCreate();
-	entity->type = ENTITY_emitter;
-	return entity;
+	GameState* gs = game_state();
+	Emitter* emit = TH_ARRAY_PUSH(gs->emitters, gs->emitter_count);
+	return emit;
 }
 
 static void th_world_init(WorldState* world) {
@@ -508,11 +543,11 @@ function void ProcessPlayerInteraction(TH_Coroutine* coro, FrameState* frame) {
 		seed->pos = spawn_pos;
 
 		// fire off emitter
-		Entity* emit = EntityCreateEmitter();
+		Emitter* emit = CreateEmitter();
 		emit->pos = spawn_pos;
 		emit->emit_func = EmitterPlantSheer;
 		emit->frequency = 20.0f;
-		emit->single_frame_lifetime = 1;
+		// todo - frame arena
 
 		// wait
 
