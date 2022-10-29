@@ -94,6 +94,7 @@ struct Entity
 	Coroutine update_coro;
 	B8 interactable;
 	S8 plant_stage;
+	S8 resource_stage;
 };
 
 struct Camera {

@@ -23,13 +23,6 @@
 - [x] write a mini portable memory arena using malloc
 - [ ] get WASM build and figure out if I can use 64-bit shit?
 
-### On entities
-Pulling them out into memory arenas and giving them defined lifetimes was a mistake. Keep it simple, what was the feature I needed - I needed to have a timer on an entity for destruction, and for it to last one frame. Just make that an entity feature!!
-
-As for entities that exist on the main menu, just have a seperate batch ya silly fukin goose.
-
-KEEP IT SIMPLE.
-
 */
 
 static void frame(void)
@@ -169,6 +162,9 @@ static void frame(void)
 			break;
 		case ENTITY_plant:
 			CoroPlantUpdate(entity);
+			break;
+		case ENTITY_resource:
+			CoroResourceUpdate(entity);
 			break;
 		}
 	}
@@ -363,6 +359,16 @@ static void init(void) {
 	sub_rect.max = sub_rect.min;
 	sub_rect.max += Vec2(4, 4);
 	th_texture_sprite_create(atlas, "resource1", sub_rect);
+	sub_rect = Shift2F32(sub_rect, Vec2(4, 0));
+	sub_rect.max += Vec2(4, 4);
+	th_texture_sprite_create(atlas, "resource2", sub_rect);
+	sub_rect = Shift2F32(sub_rect, Vec2(-20, 0));
+	sub_rect.max = sub_rect.min;
+	sub_rect.max += Vec2(4, 4);
+	th_texture_sprite_create(atlas, "resource3", sub_rect);
+	sub_rect = Shift2F32(sub_rect, Vec2(4, 0));
+	sub_rect.max += Vec2(4, 4);
+	th_texture_sprite_create(atlas, "resource4", sub_rect);
 	// player
 	sub_rect.min = Vec2(16 * 10, 0);
 	sub_rect.max = sub_rect.min + Vec2(16, 32);

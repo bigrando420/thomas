@@ -58,7 +58,7 @@ function void emitter_ambient_screen(Particle* particle, Entity* emitter)
 	particle->size_mult = 1.f;
 }
 
-function void EmitterPlantSheer(Particle* particle, Entity* emitter)
+function void ParticleEmitPuff(Particle* particle, Entity* emitter)
 {
 	particle->pos = emitter->pos;
 	particle->vel = Vec2(float_random_range(-20.f, 20.f), float_random_range(-20.f, 20.f));
@@ -67,6 +67,34 @@ function void EmitterPlantSheer(Particle* particle, Entity* emitter)
 	particle->fade_in = 1;
 	particle->fade_out = 1;
 	particle->size_mult = 1.f;
+}
+
+function void EntityEmitFrame(ParticleEmitterFunc particle_func, Vec2 pos)
+{
+	Entity* entity = EntityCreateEmitter();
+	entity->type = ENTITY_particle_emitter;
+	entity->lifetime_ticks_remaining = 1;
+	entity->frequency = 20.0f; // @particle - frequency should be definied in the emit function, no?
+	entity->emit_func = particle_func;
+	entity->pos = pos;
+}
+
+function void CoroResourceUpdate(Entity* ent)
+{
+	GameState* gs = game_state();
+	WorldState* world = world_state();
+	Coroutine* coro = &ent->update_coro;
+
+	Sprite* sprite = th_texture_sprite_get("resource1");
+	sprite += ent->resource_stage;
+	ent->sprite = sprite;
+	EntitySetBoundsFromSprite(ent);
+
+	CoroutineBegin(coro);
+
+	
+
+	CoroutineEnd(coro);
 }
 
 function void CoroPlantUpdate(Entity* plant)
@@ -158,7 +186,7 @@ function void CoroSeedUpdate(Entity* seed)
 			seed->vel.x = -20.0f;
 
 			Entity* emit = EntityCreateEmitter();
-			emit->emit_func = EmitterPlantSheer;
+			emit->emit_func = ParticleEmitPuff;
 			emit->frequency = 20.0f;
 			emit->pos = seed->pos;
 			emit->lifetime_ticks_remaining = 1;
@@ -172,6 +200,7 @@ function void ProcessPlayerInteraction(Coroutine* coro, FrameState* frame)
 {
 	GameState* gs = game_state();
 	WorldState* world = world_state();
+	// todo - @zii
 	Entity* held_entity = EntityFromID(world->held_entity_id);
 	const Vec2 world_mouse = mouse_pos_in_worldspace();
 
@@ -220,7 +249,7 @@ function void ProcessPlayerInteraction(Coroutine* coro, FrameState* frame)
 		// fire off emitter
 		Entity* emit = EntityCreateEmitter();
 		emit->pos = spawn_pos;
-		emit->emit_func = EmitterPlantSheer;
+		emit->emit_func = ParticleEmitPuff;
 		emit->frequency = 20.0f;
 		emit->lifetime_ticks_remaining = 1;
 	}
@@ -233,21 +262,37 @@ function void ProcessPlayerInteraction(Coroutine* coro, FrameState* frame)
 
 		while (!gs->key_pressed[SAPP_KEYCODE_E])
 		{
-			Assert(held_entity);
-			// @ship note - can I implicitly assert this just by accessing it? How can I get neat crashes when just straight up accessing a null pointer?
+			Assert(held_entity); // @zii
 			held_entity->vel = frame->player->vel;
 			held_entity->pos = frame->player->pos;
 			held_entity->pos.x += 7.0f * frame->player->x_dir;
 			held_entity->pos.y += 10.0f;
 
+			if (frame->hovered_entity && frame->hovered_entity->type == ENTITY_resource)
+			{
+				frame->hovered_entity->frame.render_highlight = 1;
+			}
+
 			CoroutineYield(coro);
 		}
 		gs->key_pressed[SAPP_KEYCODE_E] = 0;
 
-		Assert(held_entity);
-		gs->world_state.held_entity_id = 0;
-		held_entity->vel.x += frame->player->x_dir * 100.0f;
-		held_entity->rigid_body = 1;
+		if (frame->hovered_entity && frame->hovered_entity->type == ENTITY_resource)
+		{
+			EntityDestroy(held_entity);
+			frame->hovered_entity->resource_stage++;
+			frame->hovered_entity->frame.render_highlight = 1;
+			// play forest sound of buildy build
+
+			EntityEmitFrame(ParticleEmitPuff, frame->hovered_entity->pos);
+		}
+		else
+		{
+			Assert(held_entity);
+			gs->world_state.held_entity_id = 0;
+			held_entity->vel.x += frame->player->x_dir * 100.0f;
+			held_entity->rigid_body = 1;
+		}
 	}
 
 	CoroutineReset(coro);
@@ -268,18 +313,19 @@ function void WorldInit(WorldState* world)
 
 	// is all begins with...
 	entity = EntityCreateSeed();
+	entity->pos.x = -30;
 
 	// test resource
 	entity = EntityCreateResource();
-	entity->pos.x = 100.0f;
+	entity->pos.x = 10.0f;
+	entity = EntityCreateResource();
+	entity->pos.x = 30.0f;
+	entity = EntityCreateResource();
+	entity->pos.x = 50.0f;
+	entity = EntityCreateResource();
+	entity->pos.x = 60.0f;
 
 	// test plant
-	entity = EntityCreatePlant();
-	entity->pos.x = 20;
-	entity->plant_stage = plant_stage_max;
-	entity = EntityCreatePlant();
-	entity->pos.x = 50;
-	entity->plant_stage = plant_stage_max;
 	entity = EntityCreatePlant();
 	entity->pos.x = -50.0f;
 }
