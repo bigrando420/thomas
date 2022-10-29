@@ -161,6 +161,7 @@ struct GameMemory
 	M_Arena permanent_arena;
 	M_Arena world_arena;
 	M_Arena frame_arena;
+	M_Arena last_frame_arena;
 };
 global GameMemory game_memory = { 0 };
 

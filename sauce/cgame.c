@@ -75,8 +75,15 @@ function void CoroSeedUpdate(Entity* seed)
 	WorldState* world = world_state();
 	Coroutine* coro = &seed->update_coro;
 
-	// @arena, some kind of frame chaining? look into last frame's data, copy it across to this frame, and keep going? auto-frees whenever the copy fails to happen.
-	// this is how I could have a local stack
+	struct CoroState
+	{
+		F32 offset;
+	};
+	struct CoroState* cs = (CoroState*)coro->data;
+	if (!cs)
+	{
+		cs = (CoroState*)M_ArenaAlloc(&game_memory.frame_arena, sizeof(CoroState));
+	}
 
 	F32 target;
 
@@ -92,7 +99,9 @@ function void CoroSeedUpdate(Entity* seed)
 		while (seed->zero_timer > 0.0f)
 		{
 			target = float_random_range(-5.0f, 5.0f);
-			seed->render_offset.x = AnimateToTarget(seed->render_offset.x, target, 10.0f);
+			cs->offset = AnimateToTarget(cs->offset, target, 10.0f);
+
+			seed->render_offset.x = cs->offset;
 
 			CoroutineYield(coro);
 		}

@@ -32,7 +32,11 @@ KEEP IT SIMPLE.
 
 */
 
-static void frame(void) {
+static void frame(void)
+{
+	Swap(M_Arena, game_memory.frame_arena, game_memory.last_frame_arena);
+	M_ArenaClear(&game_memory.frame_arena);
+	
 	GameState* gs = game_state();
 	WorldState* world = world_state();
 	if (gs->key_pressed[SAPP_KEYCODE_B])
@@ -337,8 +341,6 @@ static void frame(void) {
 	memset(&gs->mouse_pressed, 0, sizeof(gs->mouse_pressed));
 	memset(&gs->mouse_released, 0, sizeof(gs->mouse_released));
 
-	M_ArenaClear(TH_FrameArena());
-
 	// tick down entity lifetimes
 	ForEachFlat(entity, world->entities, Entity*)
 	{
@@ -375,7 +377,7 @@ static void init(void) {
 	#define WORLD_ARENA_SIZE Megabytes(32)
 	#define FRAME_ARENA_SIZE Megabytes(32)
 
-	size_t game_memory_size = PERMANENT_ARENA_SIZE + WORLD_ARENA_SIZE + FRAME_ARENA_SIZE;
+	size_t game_memory_size = PERMANENT_ARENA_SIZE + WORLD_ARENA_SIZE + FRAME_ARENA_SIZE * 2;
 	U8* base_memory = (U8*)malloc(game_memory_size);
 	U8* memory = base_memory;
 	MemoryZero(memory, game_memory_size);
@@ -387,6 +389,9 @@ static void init(void) {
 	memory += WORLD_ARENA_SIZE;
 
 	M_ArenaInit(&game_memory.frame_arena, memory, FRAME_ARENA_SIZE);
+	memory += FRAME_ARENA_SIZE;
+
+	M_ArenaInit(&game_memory.last_frame_arena, memory, FRAME_ARENA_SIZE);
 	memory += FRAME_ARENA_SIZE;
 
 	Assert(memory - base_memory == game_memory_size);

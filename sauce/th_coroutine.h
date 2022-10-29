@@ -2,11 +2,20 @@
 // idea originated from: https://www.chiark.greenend.org.uk/~sgtatham/coroutines.html
 // Implementation by Andrew Harter
 
+/*
+
+- [x] local state
+- [ ] issue with local declartions being skipped by the case label
+- [ ] a more robust coroutine, not dependant on lines (this will break when we do hot-reload changes)
+
+*/
+
 typedef struct Coroutine Coroutine;
 struct Coroutine
 {
 	S32 line;
 	U64 start_time;
+	void* data;
 };
 
 #define CoroutineBegin(coro) switch (coro->line) {case 0: coro->line = 0;
