@@ -56,10 +56,10 @@ struct EntityFrame {
 
 enum EntityType {
 	ENTITY_null,
+	ENTITY_particle_emitter,
 	ENTITY_seed,
 	ENTITY_resource,
 	ENTITY_plant,
-	ENTITY_particle_emitter,
 };
 
 struct Entity
@@ -69,23 +69,32 @@ struct Entity
 	U32 children_entity_ids[8];
 	EntityType type;
 	U32 lifetime_ticks_remaining;
+
+	// PHYSICS
 	B8 rigid_body;
 	Vec2 pos;
 	Vec2 vel;
 	Vec2 acc;
 	Rng2F32 bounds;
 	B8 x_friction_mult;
+
+	// RENDER
 	B8 render;
 	Rng2F32 render_rect;
 	Sprite* sprite;
 	Vec4 col;
 	B8 x_dir;
-	S8 plant_stage;
-	F32 zero_timer;
-	B8 interactable;
+	Vec2 render_offset;
+
+	// PARTICLE
 	ParticleEmitterFunc emit_func;
 	F32 frequency;
+
+	// UPDATE LOGIC
 	Coroutine update_coro;
+	B8 interactable;
+	F32 zero_timer;
+	S8 plant_stage;
 };
 
 struct Camera {
@@ -122,6 +131,7 @@ struct GameState
 	U32 particle_count;
 
 	// per-frame
+	F32 delta_t;
 	Vec2 mouse_pos;
 	Vec2 window_size;
 	B8 key_pressed[SAPP_KEYCODE_MENU];
@@ -137,6 +147,12 @@ static GameState* game_state() {
 static WorldState* world_state() {
 	GameState* gs = game_state();
 	return &gs->world_state;
+}
+
+function F32 APP_DT()
+{
+	GameState* gs = game_state();
+	return gs->delta_t;
 }
 
 typedef struct GameMemory GameMemory;

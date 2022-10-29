@@ -54,6 +54,7 @@ static void frame(void) {
 	gs->window_size = window_size;
 	F32 ratio = window_size.x / (F32)window_size.y;
 	F32 delta_t = sapp_frame_duration();
+	gs->delta_t = delta_t;
 	const Vec2 world_mouse = mouse_pos_in_worldspace();
 
 	// PLAYER INPUT
@@ -156,6 +157,16 @@ static void frame(void) {
 	{
 		if (entity->id == 0)
 			continue;
+
+		// timer to zero
+		if (entity->zero_timer != 0)
+		{
+			entity->zero_timer -= delta_t;
+			if (entity->zero_timer <= 0)
+			{
+				entity->zero_timer = 0;
+			}
+		}
 
 		switch(entity->type)
 		{
@@ -279,6 +290,7 @@ static void frame(void) {
 			continue;
 
 		Rng2F32 rect = Shift2F32(entity->render_rect, entity->pos);
+		rect = Shift2F32(rect, entity->render_offset);
 		sgp_set_color(V4_EXPAND(entity->col));
 		if (entity->frame.render_highlight)
 			sgp_set_color(0.5f, 0.5f, 0.5f, 0.5f);

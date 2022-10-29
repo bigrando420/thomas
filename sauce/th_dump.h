@@ -25,6 +25,13 @@ static bool float_is_zero(const F32& a) {
 	return float_equals(a, 0.0f);
 }
 
+function F32 FractF32(F32 x)
+{
+	return (x - floorf(x));
+}
+
+#define AnimateToTarget(value, target, rate) value += ((target) - value) * (1 - Pow(2.f, -(rate) * APP_DT()))
+
 // @robust - test this properly with a slider visual to see what happens when it goes out of bounds
 static F32 float_lerp(const F32& x, const F32& a, const F32& b) {
 	return a * (1.f - x) + (b * x);

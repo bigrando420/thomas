@@ -75,18 +75,43 @@ function void CoroSeedUpdate(Entity* seed)
 	WorldState* world = world_state();
 	Coroutine* coro = &seed->update_coro;
 
+	// @arena, some kind of frame chaining? look into last frame's data, copy it across to this frame, and keep going? auto-frees whenever the copy fails to happen.
+	// this is how I could have a local stack
+
+	F32 target;
+
 	CoroutineBegin(coro);
 
-	// pokeball :)
 	CoroutineWait(coro, .5f);
 
+	if (rand() % 2 == 0)
 	{
-		Entity* new_seed = EntityCreateSeed();
-		new_seed->pos = seed->pos;
-		new_seed->vel.x = 100.0f;
-		new_seed->vel.y = 100.0f;
+		// poke ball animation
+		seed->zero_timer = 1.0f;
+
+		while (seed->zero_timer > 0.0f)
+		{
+			target = float_random_range(-5.0f, 5.0f);
+			seed->render_offset.x = AnimateToTarget(seed->render_offset.x, target, 10.0f);
+
+			CoroutineYield(coro);
+		}
+
+		// POP
+		{
+			Entity* new_seed = EntityCreateSeed();
+			new_seed->pos = seed->pos;
+			new_seed->vel.x = 20.0f;
+			seed->vel.x = -20.0f;
+
+			Entity* emit = EntityCreateEmitter();
+			emit->emit_func = EmitterPlantSheer;
+			emit->frequency = 20.0f;
+			emit->pos = seed->pos;
+			emit->lifetime_ticks_remaining = 1;
+		}
 	}
-	
+
 	CoroutineExit(coro);
 }
 
