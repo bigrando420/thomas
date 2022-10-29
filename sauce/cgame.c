@@ -69,6 +69,48 @@ function void EmitterPlantSheer(Particle* particle, Entity* emitter)
 	particle->size_mult = 1.f;
 }
 
+function void CoroPlantUpdate(Entity* plant)
+{
+	GameState* gs = game_state();
+	WorldState* world = world_state();
+	Coroutine* coro = &plant->update_coro;
+
+	// todo @coroutine - move this to end of function, when coroutines get upgraded
+	Sprite* plant_sprite = th_texture_sprite_get("plant0");
+	plant_sprite += plant->plant_stage;
+	plant->sprite = plant_sprite;
+
+	CoroutineBegin(coro);
+
+	while (plant->plant_stage < plant_stage_max)
+	{
+		CoroutineWait(coro, plant_growth_speed);
+		plant->plant_stage++;
+	}
+
+	// fruits
+	{
+		Entity* res_a = EntityCreateResource();
+		res_a->pos = plant->pos;
+		res_a->pos.y += 13;
+		res_a->pos.x += -4;
+		res_a->rigid_body = 0;
+		EntityPushChild(plant, res_a->id);
+
+		Entity* res_b = EntityCreateResource();
+		res_b->pos = plant->pos;
+		res_b->pos.y += 36;
+		res_b->pos.x += 6;
+		res_b->rigid_body = 0;
+		EntityPushChild(plant, res_b->id);
+	}
+
+	CoroutineYieldUntil(coro, !EntityHasChildren(plant));
+	plant->interactable = 1;
+	
+	CoroutineEnd(coro);
+}
+
 function void CoroSeedUpdate(Entity* seed)
 {
 	GameState* gs = game_state();
@@ -77,13 +119,16 @@ function void CoroSeedUpdate(Entity* seed)
 
 	struct CoroState
 	{
-		F32 offset;
+		F32 timer;
 	};
-	struct CoroState* cs = (CoroState*)coro->data;
-	if (!cs)
+	struct CoroState* old_cs = (CoroState*)coro->data;
+	struct CoroState* cs = 0;
+	cs = (CoroState*)M_ArenaAlloc(&game_memory.frame_arena, sizeof(CoroState));
+	if (old_cs)
 	{
-		cs = (CoroState*)M_ArenaAlloc(&game_memory.frame_arena, sizeof(CoroState));
+		MemoryCopy(cs, old_cs, sizeof(CoroState));
 	}
+	coro->data = cs;
 
 	F32 target;
 
@@ -91,18 +136,17 @@ function void CoroSeedUpdate(Entity* seed)
 
 	CoroutineWait(coro, .5f);
 
-	if (rand() % 2 == 0)
+	if (rand() % 2 == 0) // todo - better @rand
 	{
-		// poke ball animation
-		seed->zero_timer = 1.0f;
+		cs->timer = 1.0f;
 
-		while (seed->zero_timer > 0.0f)
+		// @coro - could probs just reuse the timer in the api and create some kind of waitfor that allows me to do logic while waiting?
+		while (cs->timer > 0.0f)
 		{
 			target = float_random_range(-5.0f, 5.0f);
-			cs->offset = AnimateToTarget(cs->offset, target, 10.0f);
+			seed->render_offset.x = AnimateToTarget(seed->render_offset.x, target, 10.0f);
 
-			seed->render_offset.x = cs->offset;
-
+			cs->timer -= APP_DT();
 			CoroutineYield(coro);
 		}
 
@@ -121,7 +165,7 @@ function void CoroSeedUpdate(Entity* seed)
 		}
 	}
 
-	CoroutineExit(coro);
+	CoroutineEnd(coro);
 }
 
 function void ProcessPlayerInteraction(Coroutine* coro, FrameState* frame)

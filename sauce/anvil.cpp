@@ -162,77 +162,14 @@ static void frame(void)
 		if (entity->id == 0)
 			continue;
 
-		// timer to zero
-		if (entity->zero_timer != 0)
-		{
-			entity->zero_timer -= delta_t;
-			if (entity->zero_timer <= 0)
-			{
-				entity->zero_timer = 0;
-			}
-		}
-
 		switch(entity->type)
 		{
 		case ENTITY_seed:
 			CoroSeedUpdate(entity);
 			break;
-		}
-	}
-
-	// PLANT UPDATE
-	ForEachFlat(plant, world->entities, Entity*) {
-		if (plant->type != ENTITY_plant)
-			continue;
-
-		S8 previous_stage = plant->plant_stage;
-		if (plant->zero_timer != 0)
-		{
-			plant->zero_timer -= delta_t;
-			if (plant->zero_timer <= 0)
-			{
-				plant->plant_stage++;
-				plant->zero_timer = 0;
-				if (plant->plant_stage < plant_stage_max)
-				{
-					plant->zero_timer = plant_growth_speed; // kick off another timer
-				}
-			}
-		}
-		else if (plant->plant_stage == 0)
-		{
-			plant->zero_timer = plant_growth_speed;
-		}
-
-		Sprite* plant_sprite = th_texture_sprite_get("plant0");
-		plant_sprite += plant->plant_stage;
-		plant->sprite = plant_sprite;
-		
-		B8 at_max_growth = plant->plant_stage == plant_stage_max;
-
-		if (plant->plant_stage != previous_stage && at_max_growth)
-		{
-			// @tooling - some kind of handle information from the sprite? maybe like a red pixel, or create another layer on information on top? Ideally I'd like to have another application running in the background where I can author this data.
-			Entity* res_a = EntityCreateResource();
-			res_a->pos = plant->pos;
-			res_a->pos.y += 13;
-			res_a->pos.x += -4;
-			res_a->rigid_body = 0;
-			EntityPushChild(plant, res_a->id);
-			// PushChild could actually put a parent ID in?
-			// just gotta be careful to keep them in sync via the helper funcs
-
-			Entity* res_b = EntityCreateResource();
-			res_b->pos = plant->pos;
-			res_b->pos.y += 36;
-			res_b->pos.x += 6;
-			res_b->rigid_body = 0;
-			EntityPushChild(plant, res_b->id);
-		}
-
-		if (at_max_growth && !EntityHasChildren(plant))
-		{
-			plant->interactable = 1;
+		case ENTITY_plant:
+			CoroPlantUpdate(entity);
+			break;
 		}
 	}
 

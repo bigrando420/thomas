@@ -93,7 +93,6 @@ struct Entity
 	// UPDATE LOGIC
 	Coroutine update_coro;
 	B8 interactable;
-	F32 zero_timer;
 	S8 plant_stage;
 };
 
