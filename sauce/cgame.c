@@ -33,7 +33,7 @@ function Entity* EntityCreateResource()
 function Entity* EntityCreateSeed()
 {
 	Entity* entity = EntityCreate();
-	entity->bounds.max = Vec2(2.0f, 2.0f);
+	entity->bounds.max = Vec2{ 2.0f, 2.0f };
 	entity->bounds = range2_center_bottom(entity->bounds);
 	entity->render = 1;
 	entity->interactable = 1;
@@ -50,8 +50,8 @@ function void emitter_ambient_screen(Particle* particle, Entity* emitter)
 	Rng2F32 bounds = camera_get_bounds();
 	particle->pos.x = float_random_range(bounds.min.x, bounds.max.x);
 	particle->pos.y = float_random_range(bounds.min.y, bounds.max.y);
-	particle->vel = Vec2(float_random_range(-1.f, 1.f), float_random_range(2.f, 4.f));
-	particle->col = Vec4(0.7f, 0.7f, 0.7f, 1.0f);
+	particle->vel = Vec2{ float_random_range(-1.f, 1.f), float_random_range(2.f, 4.f) };
+	particle->col = Vec4{ 0.7f, 0.7f, 0.7f, 1.0f };
 	particle->start_life = particle->life = 2.f;
 	particle->fade_in = 1;
 	particle->fade_out = 1;
@@ -61,8 +61,8 @@ function void emitter_ambient_screen(Particle* particle, Entity* emitter)
 function void ParticleEmitPuff(Particle* particle, Entity* emitter)
 {
 	particle->pos = emitter->pos;
-	particle->vel = Vec2(float_random_range(-20.f, 20.f), float_random_range(-20.f, 20.f));
-	particle->col = Vec4(0.7f, 0.7f, 0.7f, 1.0f);
+	particle->vel = Vec2{ float_random_range(-20.f, 20.f), float_random_range(-20.f, 20.f) };
+	particle->col = Vec4{ 0.7f, 0.7f, 0.7f, 1.0f };
 	particle->start_life = particle->life = 0.2f;
 	particle->fade_in = 1;
 	particle->fade_out = 1;

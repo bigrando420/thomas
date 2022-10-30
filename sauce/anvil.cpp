@@ -29,7 +29,7 @@ static void frame(void)
 {
 	Swap(M_Arena, game_memory.frame_arena, game_memory.last_frame_arena);
 	M_ArenaClear(&game_memory.frame_arena);
-	
+
 	GameState* gs = game_state();
 	WorldState* world = world_state();
 	if (gs->key_pressed[SAPP_KEYCODE_B])
@@ -103,15 +103,15 @@ static void frame(void)
 	sgp_begin(window_size.x, window_size.y);
 	sgp_viewport(0, 0, window_size.x, window_size.y);
 
-	#if 1
+#if 1
 	sgp_project(window_size.x * -0.5f, window_size.x * 0.5f, window_size.y * 0.5f, window_size.y * -0.5f);
 	sgp_scale(gs->cam.scale, gs->cam.scale);
 	sgp_translate(-gs->cam.pos.x, -gs->cam.pos.y);
-	#else
+#else
 	Rng2F32 view_rect = { 0 };
-	view_rect.max = Vec2(window_size.x, window_size.y);
+	view_rect.max = Vec2{ window_size.x, window_size.y };
 	view_rect = range2_center_middle(view_rect);
-	view_rect = Shift2F32(view_rect, Vec2(0, 100.f));
+	view_rect = Shift2F32(view_rect, Vec2{ 0, 100.f });
 	view_rect = range2_scale(view_rect, gs->cam.scale);
 	view_rect = Shift2F32(view_rect, gs->cam.pos);
 	sgp_project(view_rect.min.x, view_rect.max.x, view_rect.max.y, view_rect.min.y);
@@ -130,7 +130,7 @@ static void frame(void)
 
 		// INTERACTION RECT
 		Rng2F32 interact_rect = { 0 };
-		interact_rect.max = Vec2(20, 20);
+		interact_rect.max = Vec2{ 20, 20 };
 		if (frame.player->x_dir == -1)
 			interact_rect = Flip2F32(interact_rect);
 		interact_rect = Shift2F32(interact_rect, frame.player->pos);
@@ -211,7 +211,7 @@ static void frame(void)
 		alpha = float_alpha_sin_mid(alpha);
 
 		DeferLoop(sgp_push_transform(), sgp_pop_transform()) {
-			Vec2 render_size = Vec2(1, 1) * particle->size_mult;
+			Vec2 render_size = Vec2{ 1, 1 } *particle->size_mult;
 			sgp_set_color(particle->col.r, particle->col.g, particle->col.b, particle->col.a * alpha);
 			sgp_translate(particle->pos.x, particle->pos.y);
 			sgp_draw_filled_rect(render_size.x * -0.5f, render_size.y * -0.5f, render_size.x, render_size.y);
@@ -306,9 +306,9 @@ static void init(void) {
 	}
 
 	// Allocate Game Memory
-	#define PERMANENT_ARENA_SIZE Megabytes(32)
-	#define WORLD_ARENA_SIZE Megabytes(32)
-	#define FRAME_ARENA_SIZE Megabytes(32)
+#define PERMANENT_ARENA_SIZE Megabytes(32)
+#define WORLD_ARENA_SIZE Megabytes(32)
+#define FRAME_ARENA_SIZE Megabytes(32)
 
 	size_t game_memory_size = PERMANENT_ARENA_SIZE + WORLD_ARENA_SIZE + FRAME_ARENA_SIZE * 2;
 	U8* base_memory = (U8*)malloc(game_memory_size);
@@ -338,40 +338,40 @@ static void init(void) {
 	// TEXTURES
 	TextureAtlas* atlas = th_texture_atlas_load("dump.png");
 	// plant stages
-	Rng2F32 sub_rect = Rng2F32(Vec2(), Vec2(16, 64));
+	Rng2F32 sub_rect = Rng2F32{ Vec2{}, Vec2{ 16, 64 } };
 	th_texture_sprite_create(atlas, "plant0", sub_rect);
-	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
+	sub_rect = Shift2F32(sub_rect, Vec2{ 16, 0 });
 	th_texture_sprite_create(atlas, "plant1", sub_rect);
-	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
+	sub_rect = Shift2F32(sub_rect, Vec2{ 16, 0 });
 	th_texture_sprite_create(atlas, "plant2", sub_rect);
-	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
+	sub_rect = Shift2F32(sub_rect, Vec2{ 16, 0 });
 	th_texture_sprite_create(atlas, "plant3", sub_rect);
-	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
+	sub_rect = Shift2F32(sub_rect, Vec2{ 16, 0 });
 	th_texture_sprite_create(atlas, "plant4", sub_rect);
-	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
+	sub_rect = Shift2F32(sub_rect, Vec2{ 16, 0 });
 	th_texture_sprite_create(atlas, "plant5", sub_rect);
-	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
+	sub_rect = Shift2F32(sub_rect, Vec2{ 16, 0 });
 	th_texture_sprite_create(atlas, "plant6", sub_rect);
-	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
+	sub_rect = Shift2F32(sub_rect, Vec2{ 16, 0 });
 	th_texture_sprite_create(atlas, "plant7", sub_rect);
 	// resources
-	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
+	sub_rect = Shift2F32(sub_rect, Vec2{ 16, 0 });
 	sub_rect.max = sub_rect.min;
-	sub_rect.max += Vec2(4, 4);
+	sub_rect.max += Vec2{ 4, 4 };
 	th_texture_sprite_create(atlas, "resource1", sub_rect);
-	sub_rect = Shift2F32(sub_rect, Vec2(4, 0));
-	sub_rect.max += Vec2(4, 4);
+	sub_rect = Shift2F32(sub_rect, Vec2{ 4, 0 });
+	sub_rect.max += Vec2{ 4, 4 };
 	th_texture_sprite_create(atlas, "resource2", sub_rect);
-	sub_rect = Shift2F32(sub_rect, Vec2(-20, 0));
+	sub_rect = Shift2F32(sub_rect, Vec2{ -20, 0 });
 	sub_rect.max = sub_rect.min;
-	sub_rect.max += Vec2(4, 4);
+	sub_rect.max += Vec2{ 4, 4 };
 	th_texture_sprite_create(atlas, "resource3", sub_rect);
-	sub_rect = Shift2F32(sub_rect, Vec2(4, 0));
-	sub_rect.max += Vec2(4, 4);
+	sub_rect = Shift2F32(sub_rect, Vec2{ 4, 0 });
+	sub_rect.max += Vec2{ 4, 4 };
 	th_texture_sprite_create(atlas, "resource4", sub_rect);
 	// player
-	sub_rect.min = Vec2(16 * 10, 0);
-	sub_rect.max = sub_rect.min + Vec2(16, 32);
+	sub_rect.min = Vec2{ 16 * 10, 0 };
+	sub_rect.max = sub_rect.min + Vec2{ 16, 32 };
 	th_texture_sprite_create(atlas, "arcane_player", sub_rect);
 
 	{
@@ -424,7 +424,7 @@ static void event(const sapp_event* ev) {
 		gs->cam.scale = Clamp(1.0f, gs->cam.scale, 10.0f);
 	} break;
 	case SAPP_EVENTTYPE_MOUSE_MOVE: {
-		gs->mouse_pos = Vec2(ev->mouse_x, ev->mouse_y);
+		gs->mouse_pos = Vec2{ ev->mouse_x, ev->mouse_y };
 	};
 	}
 

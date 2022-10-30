@@ -13,8 +13,8 @@
 #define RENDER_COLLIDER_COLOR 1.0f, 0.5f, 0.5f, 1.0f
 #endif
 
-#define TH_BLACK Vec4(0.0f, 0.0f, 0.0f, 1.0f)
-#define TH_WHITE Vec4(1.0f, 1.0f, 1.0f, 1.0f)
+#define TH_BLACK Vec4{ 0.0f, 0.0f, 0.0f, 1.0f }
+#define TH_WHITE Vec4{ 1.0f, 1.0f, 1.0f, 1.0f }
 
 typedef struct Entity Entity;
 typedef struct Particle Particle;
@@ -261,8 +261,8 @@ static Rng2F32 camera_get_bounds()
 	GameState* gs = game_state();
 	// todo - @camera
 	Rng2F32 cam = { 0 };
-	cam.max = Vec2((int)gs->window_size.x, (int)gs->window_size.y);
-	cam = Shift2F32(cam, Vec2((int)gs->window_size.x, (int)gs->window_size.y) * -0.5f);
+	cam.max = Vec2{ gs->window_size.x, gs->window_size.y };
+	cam = Shift2F32(cam, Vec2{ gs->window_size.x, gs->window_size.y } *-0.5f);
 	return cam;
 }
 
