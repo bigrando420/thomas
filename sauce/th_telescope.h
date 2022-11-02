@@ -20,7 +20,44 @@ function Rng2F32 Flip2F32(Rng2F32 r)
 	return result;
 }
 
+function Vec4F32 RGBA8ToV4F32(const U8 r, const U8 g, const U8 b, const U8 a)
+{
+  Vec4F32 result = { (F32)r / 255.f, (F32)g / 255.f, (F32)b / 255.f, (F32)a / 255.f };
+  return result;
+}
+
+function Vec4F32 ShiftV4HSV(const Vec4F32 col, const Vec3F32 hsv)
+{
+  Vec3F32 result = V3F32(col.r, col.g, col.b);
+  result = HSVFromRGB(result);
+  result.x += hsv.x;
+  result.x = Clamp(0.f, result.x, 1.f);
+  result.y += hsv.y;
+  result.y = Clamp(0.f, result.y, 1.f);
+  result.z += hsv.z;
+  result.z = Clamp(0.f, result.z, 1.f);
+  result = RGBFromHSV(result);
+  return V4F32(result.r, result.g, result.b, col.a);
+}
+
+function Vec4F32 MulV4HSV(const Vec4F32 col, const Vec3F32 hsv)
+{
+  Vec3F32 result = V3F32(col.r, col.g, col.b);
+  result = HSVFromRGB(result);
+  // TODO - wrap functionality for the Hue?
+  result.x *= hsv.x;
+  result.y *= hsv.y;
+  result.z *= hsv.z;
+  result = RGBFromHSV(result);
+  return V4F32(result.r, result.g, result.b, col.a);
+}
+
+
+
+
+
 // MATH OPERATOR OVERLOADS
+#ifdef CPP
 function Vec2 operator*(F32 scale, Vec2 vec)
 {
 	return Scale2F32(vec, scale);
@@ -52,3 +89,4 @@ function Vec2& operator+=(Vec2& self, Vec2 other)
 	self.y += other.y;
 	return self;
 }
+#endif

@@ -68,7 +68,7 @@ static void frame(void)
 			axis_input.x += 1.0f;
 			frame.player->x_dir = 1;
 		}
-		frame.player->acc = axis_input * MOVE_SPEED;
+		frame.player->acc = Scale2F32(axis_input, MOVE_SPEED);
 	}
 
 	// Entity Physics
@@ -84,10 +84,14 @@ static void frame(void)
 		entity->acc.y -= (falling ? 2.f : 1.f) * GRAVITY;
 
 		// integrate acceleration and velocity into position
-		Vec2 next_pos = 0.5f * entity->acc * SQUARE(delta_t) + entity->vel * delta_t + entity->pos;
+		Vec2F32 next_pos;
+		next_pos = Scale2F32(entity->acc, 0.5f);
+		next_pos = Scale2F32(next_pos, SQUARE(APP_DT()));
+		next_pos = Add2F32(next_pos, Scale2F32(entity->vel, APP_DT()));
+		next_pos = Add2F32(next_pos, entity->pos);
 
 		// integrate acceleration into velocity
-		entity->vel += entity->acc * delta_t;
+		entity->vel = Add2F32(Scale2F32(entity->acc, APP_DT()), entity->vel);
 		entity->acc.x = 0;
 		entity->acc.y = 0;
 
@@ -130,7 +134,7 @@ static void frame(void)
 
 		// INTERACTION RECT
 		Rng2F32 interact_rect = { 0 };
-		interact_rect.max = Vec2(20, 20);
+		interact_rect.max = V2(20, 20);
 		if (frame.player->x_dir == -1)
 			interact_rect = Flip2F32(interact_rect);
 		interact_rect = Shift2F32(interact_rect, frame.player->pos);
@@ -186,7 +190,7 @@ static void frame(void)
 			if (gs->particle_count == ArrayCount(gs->particles))
 				gs->particle_count = 0;
 			Particle* new_particle = &gs->particles[gs->particle_count];
-			if (!float_is_zero(new_particle->life))
+			if (!F32IsZero(new_particle->life))
 				LOG("warning: particles are being overridden");
 			emitter->emit_func(new_particle, emitter);
 		}
@@ -195,7 +199,7 @@ static void frame(void)
 	// Particle Render
 	for (int i = 0; i < ArrayCount(gs->particles); i++) {
 		Particle* particle = &gs->particles[i];
-		if (float_is_zero(particle->life))
+		if (F32IsZero(particle->life))
 			continue;
 
 		Assert(particle->life > 0.f);
@@ -205,13 +209,14 @@ static void frame(void)
 			continue;
 		}
 
-		particle->pos += particle->vel * delta_t;
+		particle->pos = Add2F32(Scale2F32(particle->vel, delta_t), particle->pos);
 
-		F32 alpha = float_alpha(particle->life, particle->start_life, 0.f);
+		F32 alpha = AlphaF32(particle->life, particle->start_life, 0.f);
 		alpha = float_alpha_sin_mid(alpha);
 
-		DeferLoop(sgp_push_transform(), sgp_pop_transform()) {
-			Vec2 render_size = Vec2(1, 1) * particle->size_mult;
+		DeferLoop(sgp_push_transform(), sgp_pop_transform())
+		{
+			Vec2 render_size = Scale2F32(V2(1, 1), particle->size_mult);
 			sgp_set_color(particle->col.r, particle->col.g, particle->col.b, particle->col.a * alpha);
 			sgp_translate(particle->pos.x, particle->pos.y);
 			sgp_draw_filled_rect(render_size.x * -0.5f, render_size.y * -0.5f, render_size.x, render_size.y);
@@ -230,7 +235,11 @@ static void frame(void)
 		rect = Shift2F32(rect, entity->render_offset);
 		sgp_set_color(V4_EXPAND(entity->col));
 		if (entity->frame.render_highlight)
-			sgp_set_color(0.5f, 0.5f, 0.5f, 0.5f);
+		{
+			// @polish - better highlight feedback
+			Vec4 col = Scale4F32(entity->col, 0.8f);
+			sgp_set_color(V4_EXPAND(col));
+		}
 		if (entity->sprite) {
 			Assert(entity->sprite->atlas); // invalid atlas
 			sgp_rect target_rect = range2_to_sgp_rect(rect);
@@ -338,48 +347,20 @@ static void init(void) {
 	// TEXTURES
 	TextureAtlas* atlas = th_texture_atlas_load("dump.png");
 	// plant stages
-	Rng2F32 sub_rect = Rng2F32(Vec2(), Vec2(16, 64));
-	th_texture_sprite_create(atlas, "plant0", sub_rect);
-	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
-	th_texture_sprite_create(atlas, "plant1", sub_rect);
-	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
-	th_texture_sprite_create(atlas, "plant2", sub_rect);
-	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
-	th_texture_sprite_create(atlas, "plant3", sub_rect);
-	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
-	th_texture_sprite_create(atlas, "plant4", sub_rect);
-	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
-	th_texture_sprite_create(atlas, "plant5", sub_rect);
-	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
-	th_texture_sprite_create(atlas, "plant6", sub_rect);
-	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
-	th_texture_sprite_create(atlas, "plant7", sub_rect);
+	TextureSpriteCreate(atlas, "plant0", R2F32(V2(0, 0), V2(16, 64)));
+	TextureSpriteCreate(atlas, "plant1", R2F32(V2(16, 0), V2(32, 64)));
+	TextureSpriteCreate(atlas, "plant2", R2F32(V2(32, 0), V2(48, 64)));
+	TextureSpriteCreate(atlas, "plant3", R2F32(V2(48, 0), V2(64, 64)));
+	TextureSpriteCreate(atlas, "plant4", R2F32(V2(64, 0), V2(80, 64)));
+	TextureSpriteCreate(atlas, "plant5", R2F32(V2(80, 0), V2(96, 64)));
+	TextureSpriteCreate(atlas, "plant6", R2F32(V2(96, 0), V2(112, 64)));
 	// resources
-	sub_rect = Shift2F32(sub_rect, Vec2(16, 0));
-	sub_rect.max = sub_rect.min;
-	sub_rect.max += Vec2(4, 4);
-	th_texture_sprite_create(atlas, "resource1", sub_rect);
-	sub_rect = Shift2F32(sub_rect, Vec2(4, 0));
-	sub_rect.max += Vec2(4, 4);
-	th_texture_sprite_create(atlas, "resource2", sub_rect);
-	sub_rect = Shift2F32(sub_rect, Vec2(-20, 0));
-	sub_rect.max = sub_rect.min;
-	sub_rect.max += Vec2(4, 4);
-	th_texture_sprite_create(atlas, "resource3", sub_rect);
-	sub_rect = Shift2F32(sub_rect, Vec2(4, 0));
-	sub_rect.max += Vec2(4, 4);
-	th_texture_sprite_create(atlas, "resource4", sub_rect);
+	TextureSpriteCreate(atlas, "resource1", R2F32(V2(112, 0), V2(116, 4)));
+	TextureSpriteCreate(atlas, "resource2", R2F32(V2(116, 0), V2(120, 4)));
+	TextureSpriteCreate(atlas, "resource3", R2F32(V2(120, 0), V2(124, 4)));
+	TextureSpriteCreate(atlas, "resource4", R2F32(V2(124, 0), V2(128, 4)));
 	// player
-	sub_rect.min = Vec2(16 * 10, 0);
-	sub_rect.max = sub_rect.min + Vec2(16, 32);
-	th_texture_sprite_create(atlas, "arcane_player", sub_rect);
-
-	{
-		// background emitter
-		Entity* emit = EntityCreateEmitter();
-		emit->emit_func = emitter_ambient_screen;
-		emit->frequency = 10.0f;
-	}
+	TextureSpriteCreate(atlas, "arcane_player", R2F32(V2(160, 0), V2(176, 32)));
 
 	gs->cam.scale = DEFAULT_CAMERA_SCALE;
 
@@ -424,7 +405,7 @@ static void event(const sapp_event* ev) {
 		gs->cam.scale = Clamp(1.0f, gs->cam.scale, 10.0f);
 	} break;
 	case SAPP_EVENTTYPE_MOUSE_MOVE: {
-		gs->mouse_pos = Vec2(ev->mouse_x, ev->mouse_y);
+		gs->mouse_pos = V2(ev->mouse_x, ev->mouse_y);
 	};
 	}
 

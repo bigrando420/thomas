@@ -96,7 +96,7 @@
     <ClInclude Include="sauce\th_telescope.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="sauce\anvil.cpp" />
+    <ClCompile Include="sauce\anvil.c" />
     <ClCompile Include="sauce\ext\telescope\base\base_atlas.c" />
     <ClCompile Include="sauce\ext\telescope\base\base_inc.c" />
     <ClCompile Include="sauce\ext\telescope\base\base_math.c" />

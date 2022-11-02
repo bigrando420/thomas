@@ -6,10 +6,9 @@
 
 - [x] local state
 - [ ] issue with local declartions being skipped by the case label
-- [ ] a more robust coroutine, not dependant on lines (this will break when we do hot-reload changes)
+- [ ] default: catch for out of sync coroutines
 
-did somebody say goto statement?
-this would also solve the label naming issue hmmmmmm
+the hot-reload / serialisation issue of out-of-sync line changes is probs a non-issue, don't pre-empt it. Focus on what's right in front of me.
 
 */
 

@@ -33,7 +33,7 @@ function Entity* EntityCreateResource()
 function Entity* EntityCreateSeed()
 {
 	Entity* entity = EntityCreate();
-	entity->bounds.max = Vec2(2.0f, 2.0f);
+	entity->bounds.max = V2(2.0f, 2.0f);
 	entity->bounds = range2_center_bottom(entity->bounds);
 	entity->render = 1;
 	entity->interactable = 1;
@@ -50,8 +50,8 @@ function void emitter_ambient_screen(Particle* particle, Entity* emitter)
 	Rng2F32 bounds = camera_get_bounds();
 	particle->pos.x = float_random_range(bounds.min.x, bounds.max.x);
 	particle->pos.y = float_random_range(bounds.min.y, bounds.max.y);
-	particle->vel = Vec2(float_random_range(-1.f, 1.f), float_random_range(2.f, 4.f));
-	particle->col = Vec4(0.7f, 0.7f, 0.7f, 1.0f);
+	particle->vel = V2(float_random_range(-1.f, 1.f), float_random_range(2.f, 4.f));
+	particle->col = V4(0.7f, 0.7f, 0.7f, 1.0f);
 	particle->start_life = particle->life = 2.f;
 	particle->fade_in = 1;
 	particle->fade_out = 1;
@@ -61,8 +61,8 @@ function void emitter_ambient_screen(Particle* particle, Entity* emitter)
 function void ParticleEmitPuff(Particle* particle, Entity* emitter)
 {
 	particle->pos = emitter->pos;
-	particle->vel = Vec2(float_random_range(-20.f, 20.f), float_random_range(-20.f, 20.f));
-	particle->col = Vec4(0.7f, 0.7f, 0.7f, 1.0f);
+	particle->vel = V2(float_random_range(-20.f, 20.f), float_random_range(-20.f, 20.f));
+	particle->col = V4(0.7f, 0.7f, 0.7f, 1.0f);
 	particle->start_life = particle->life = 0.2f;
 	particle->fade_in = 1;
 	particle->fade_out = 1;
@@ -89,12 +89,6 @@ function void CoroResourceUpdate(Entity* ent)
 	sprite += ent->resource_stage;
 	ent->sprite = sprite;
 	EntitySetBoundsFromSprite(ent);
-
-	CoroutineBegin(coro);
-
-	
-
-	CoroutineEnd(coro);
 }
 
 function void CoroPlantUpdate(Entity* plant)
@@ -103,7 +97,6 @@ function void CoroPlantUpdate(Entity* plant)
 	WorldState* world = world_state();
 	Coroutine* coro = &plant->update_coro;
 
-	// todo @coroutine - move this to end of function, when coroutines get upgraded
 	Sprite* plant_sprite = th_texture_sprite_get("plant0");
 	plant_sprite += plant->plant_stage;
 	plant->sprite = plant_sprite;
@@ -149,12 +142,12 @@ function void CoroSeedUpdate(Entity* seed)
 	{
 		F32 timer;
 	};
-	struct CoroState* old_cs = (CoroState*)coro->data;
+	struct CoroState* old_cs = coro->data;
 	struct CoroState* cs = 0;
-	cs = (CoroState*)M_ArenaAlloc(&game_memory.frame_arena, sizeof(CoroState));
+	cs = M_ArenaAlloc(&game_memory.frame_arena, sizeof(struct CoroState));
 	if (old_cs)
 	{
-		MemoryCopy(cs, old_cs, sizeof(CoroState));
+		MemoryCopy(cs, old_cs, sizeof(struct CoroState));
 	}
 	coro->data = cs;
 
@@ -328,4 +321,9 @@ function void WorldInit(WorldState* world)
 	// test plant
 	entity = EntityCreatePlant();
 	entity->pos.x = -50.0f;
+
+	// background emitter
+	entity = EntityCreateEmitter();
+	entity->emit_func = emitter_ambient_screen;
+	entity->frequency = 10.0f;
 }

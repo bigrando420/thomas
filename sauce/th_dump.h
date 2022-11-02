@@ -17,12 +17,19 @@
 #define V4_EXPAND(vec) vec.x, vec.y, vec.z, vec.w
 
 
-static B8 float_equals(const F32& a, const F32& b, const F32& epsilon = 0.00001f) {
+function B8 F32EqualsEpsilon(F32 a, F32 b, F32 epsilon)
+{
 	return (fabsf(a - b) < epsilon);
 }
 
-static bool float_is_zero(const F32& a) {
-	return float_equals(a, 0.0f);
+function B8 F32Equals(F32 a, F32 b)
+{
+	return F32EqualsEpsilon(a, b, 0.00001f);
+}
+
+function bool F32IsZero(F32 a)
+{
+	return F32Equals(a, 0.0f);
 }
 
 function F32 FractF32(F32 x)
@@ -33,18 +40,21 @@ function F32 FractF32(F32 x)
 #define AnimateToTarget(value, target, rate) value += ((target) - value) * (1 - Pow(2.f, -(rate) * APP_DT()))
 
 // @robust - test this properly with a slider visual to see what happens when it goes out of bounds
-static F32 float_lerp(const F32& x, const F32& a, const F32& b) {
+function F32 LerpF32(F32 x, F32 a, F32 b)
+{
 	return a * (1.f - x) + (b * x);
 }
 
-static F32 float_map(const F32& x, const F32& x_min, const F32& x_max, const F32& map_min, const F32& map_max) {
+function F32 MapF32(F32 x, F32 x_min, F32 x_max, F32 map_min, F32 map_max)
+{
 	return ((x - x_min) / (x_max - x_min) * (map_max - map_min) + map_min);
 }
 
 // Progress of x in the range of begin -> end. Guarenteed to be 0 -> 1
 // is this just a normalised lerp?
-static F32 float_alpha(const F32& x, const F32& begin, const F32& end) {
-	if (float_equals(begin, end))
+function F32 AlphaF32(F32 x, F32 begin, F32 end)
+{
+	if (F32Equals(begin, end))
 		return begin;
 	F32 delta = end - begin;
 	F32 result = (x - begin) / delta;
@@ -53,17 +63,20 @@ static F32 float_alpha(const F32& x, const F32& begin, const F32& end) {
 }
 
 // https://easings.net/
-enum TH_Ease {
+typedef enum Ease Ease;
+enum Ease
+{
 	TH_EASE_linear,
 	TH_EASE_cubic_in_out,
 };
 
-static F32 float_alpha_cubic_in_out(const F32& alpha)
+function F32 float_alpha_cubic_in_out(F32 alpha)
 {
 	return (alpha < 0.5f ? 4.f * alpha * alpha * alpha : 1.f - powf(-2.f * alpha + 2.f, 3.f) / 2.f);
 }
 
-static F32 float_alpha_ease(const F32& alpha, const TH_Ease type) {
+function F32 float_alpha_ease(F32 alpha, Ease type)
+{
 	switch (type) {
 	case TH_EASE_linear:
 		return alpha;
@@ -74,24 +87,26 @@ static F32 float_alpha_ease(const F32& alpha, const TH_Ease type) {
 	}
 }
 
-static F32 float_random_alpha() {
+function F32 float_random_alpha()
+{
 	return (F32)rand() / (F32)RAND_MAX;
 }
 
-static F32 float_random_range(const F32& min, const F32& max) {
+function F32 float_random_range(F32 min, F32 max)
+{
 	F32 result = float_random_alpha();
-	result = float_lerp(result, min, max);
+	result = LerpF32(result, min, max);
 	return result;
 }
 
-static F32 float_alpha_sin_mid(const F32& alpha)
+function F32 float_alpha_sin_mid(F32 alpha)
 {
 	F32 sin = alpha;
 	sin = (sinf((alpha - .25f) * 2.f * PiF32) / 2.f) + 0.5f;
 	return sin;
 }
 
-static Rng2F32 range2_center_bottom(Rng2F32 range) {
+function Rng2F32 range2_center_bottom(Rng2F32 range) {
 	Rng2F32 result = range;
 	Vec2 size = Dim2F32(range);
 	result.min.x -= size.x * 0.5f;
@@ -99,7 +114,7 @@ static Rng2F32 range2_center_bottom(Rng2F32 range) {
 	return result;
 }
 
-static Rng2F32 range2_center_middle(Rng2F32 range) {
+function Rng2F32 range2_center_middle(Rng2F32 range) {
 	Rng2F32 result = range;
 	Vec2 size = Dim2F32(range);
 	result.min.x -= size.x * 0.5f;
@@ -109,7 +124,7 @@ static Rng2F32 range2_center_middle(Rng2F32 range) {
 	return result;
 }
 
-static Rng2F32 range2_center_left(Rng2F32 range) {
+function Rng2F32 range2_center_left(Rng2F32 range) {
 	Rng2F32 result = range;
 	Vec2 size = Dim2F32(range);
 	result.min.y -= size.y * 0.5f;
@@ -117,14 +132,14 @@ static Rng2F32 range2_center_left(Rng2F32 range) {
 	return result;
 }
 
-static Rng2F32 range2_scale(Rng2F32 range, F32 scale) {
+function Rng2F32 range2_scale(Rng2F32 range, F32 scale) {
 	Rng2F32 result = range;
-	result.min = result.min * scale;
-	result.max = result.max * scale;
+	result.min = Scale2F32(result.min, scale);
+	result.max = Scale2F32(result.max, scale);
 	return result;
 }
 
-static Rng2F32 range2_remove_offset(Rng2F32 range) {
+function Rng2F32 range2_remove_offset(Rng2F32 range) {
 	Rng2F32 result = {0};
 	Vec2 size = Dim2F32(range);
 	result.max = size;

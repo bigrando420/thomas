@@ -18,10 +18,6 @@ All I ask is that if you have a handy idea for simplifying something, open an is
 
 All of the really nice smart stuff in this engine is derived from giants who I've learnt from, all credit goes towards them. All of the silly stuff, you can assume is my error, which will get corrected as I evolve as a programmer.
 
-### Why C++
-- operator overloading
-- that's literally it.
-
 ## TODO
 - [ ] project logo - thomas the tank engine as a bullet train lmfao (contact@randy.gg if you're keen)
 - [ ] list of inspiration with links. Ryan Fleury, Casey Muratori (handmade hero), Randy Gaul, Allen Webster, John Carmack, etc.

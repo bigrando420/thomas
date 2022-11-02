@@ -160,7 +160,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="sauce\anvil.cpp">
+    <ClCompile Include="sauce\anvil.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="sauce\ext\telescope\base\base_atlas.c">
