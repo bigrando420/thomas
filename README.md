@@ -3,7 +3,7 @@ Big bloaty game engine with lots of overhead? Me no like.
 
 Small lightweight game engine with bare essentials for making games at the speed of light? Now that... *me likey.*
 
-This bad boy is a bullet train built in C-style C++ that's fueled by simplicity and practicality.
+This bad boy is a bullet train built in C that's fueled by simplicity and practicality.
 
 <a href='https://ko-fi.com/K3K2BSEW2' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi2.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
 
